@@ -191,23 +191,40 @@ class App {
     }
 
     handleClick(event) {
+        console.log('[APP] handleClick triggered'); // Log entry into the handler
         const target = event.target.closest('[data-action]');
-        if (!target) return;
-        const action = target.dataset.action;
+        if (!target) {
+            console.log('[APP] No data-action target found for click.');
+            return;
+        }
 
-        if (action !== 'tutorial-next' && action !== 'tutorial-skip') {
+        const action = target.dataset.action;
+        console.log(`[APP] Action: ${action}`); // Log the identified action
+
+        // Keep existing audio/haptic feedback if desired
+        if (action !== 'tutorial-next' && action !== 'tutorial-skip') { // Avoid double sound for tutorial
              this.audioManager.playSound('ui_click');
         }
-        if (this.settings.hapticFeedback && navigator.vibrate) navigator.vibrate(10);
+        if (this.settings.hapticFeedback && navigator.vibrate) {
+            navigator.vibrate(10);
+        }
 
         switch (action) {
-            case 'quick-battle': this.startQuickBattle(); break;
-            case 'bot-builder': this.showScreen('bot-builder'); break;
+            case 'quick-battle':
+                console.log('[APP] Case: quick-battle');
+                this.startQuickBattle();
+                break;
+            case 'bot-builder':
+                console.log('[APP] Case: bot-builder');
+                this.showScreen('bot-builder');
+                break;
             case 'settings':
+                console.log('[APP] Case: settings');
                 this.cameFromPauseMenu = (this.currentScreen === 'game-arena' && this.gameEngine && this.gameEngine.isPaused);
                 this.showScreen('settings');
                 break;
-            case 'back': // From Settings or Bot Builder
+            case 'back':
+                console.log('[APP] Case: back');
                 if (this.currentScreen === 'settings' && this.cameFromPauseMenu) {
                     this.showScreen('game-arena');
                     const pauseMenu = document.getElementById('pause-menu');
@@ -222,13 +239,24 @@ class App {
                 }
                 this.cameFromPauseMenu = false;
                 break;
-            case 'save-bot': this.saveBotDesign(); break;
-            case 'play-again': this.startQuickBattle(); break;
-            case 'main-menu': this.showScreen('main-menu'); break; // From Game Over
+            case 'save-bot':
+                console.log('[APP] Case: save-bot');
+                this.saveBotDesign();
+                break;
+            case 'play-again':
+                console.log('[APP] Case: play-again');
+                this.startQuickBattle();
+                break;
+            case 'main-menu': // From Game Over or other screens
+                console.log('[APP] Case: main-menu (action)');
+                this.showScreen('main-menu');
+                break;
             case 'resume-game':
+                console.log('[APP] Case: resume-game');
                 if(this.gameEngine) this.gameEngine.resume();
                 break;
             case 'quit-to-main-menu':
+                console.log('[APP] Case: quit-to-main-menu');
                 if(this.gameEngine) {
                      this.gameEngine.destroy();
                      this.gameEngine = null;
@@ -236,61 +264,90 @@ class App {
                 this.isGamePaused = false;
                 this.showScreen('main-menu');
                 break;
-            case 'tutorial-next': this.handleTutorialNext(); break;
-            case 'tutorial-skip': this.endTutorial(); break;
-            default: console.warn(`Unhandled action: ${action}`);
+            case 'tutorial-next':
+                console.log('[APP] Case: tutorial-next');
+                this.handleTutorialNext();
+                break;
+            case 'tutorial-skip':
+                console.log('[APP] Case: tutorial-skip');
+                this.endTutorial();
+                break;
+            default:
+                console.warn(`[APP] Unhandled action in handleClick: ${action}`);
         }
     }
 
     showScreen(screenId) {
-        const oldScreenElement = document.getElementById(this.currentScreen);
+        console.log(`[APP] Attempting to show screen: ${screenId}. Current screen: ${this.currentScreen}`);
+
+        // Hide all screens first to avoid multiple active screens
+        const screens = document.querySelectorAll('.screen');
+        screens.forEach(s => {
+            s.style.display = 'none';
+            s.classList.remove('active');
+        });
+
         const newScreenElement = document.getElementById(screenId);
 
-        if (oldScreenElement) {
-            oldScreenElement.classList.remove('active');
-            oldScreenElement.style.display = 'none';
-        }
-
         if (newScreenElement) {
-            newScreenElement.style.display = 'flex';
+            newScreenElement.style.display = 'flex'; // Assuming 'flex' is the desired display style for active screens
             newScreenElement.classList.add('active');
-            this.currentScreen = screenId;
+            console.log(`[APP] Successfully shown screen: ${screenId}. New currentScreen will be set.`);
+            this.currentScreen = screenId; // Update currentScreen *after* successful display
         } else {
-            console.error(`Screen element not found for ID: ${screenId}`);
+            console.error(`[APP] Screen element not found for ID: ${screenId}. Current screen remains: ${this.currentScreen}`);
+            // Optionally, revert to a known safe screen like main-menu if the target is not found
+            // if (this.currentScreen !== 'main-menu') this.showScreen('main-menu');
             return;
         }
         
-        if (screenId !== 'loading-screen' && document.getElementById('loading-screen').classList.contains('active')) {
-            document.getElementById('loading-screen').style.display = 'none';
-            document.getElementById('loading-screen').classList.remove('active');
-        }
-
+        // Minimal screen-specific logic for testing button flow
         if (screenId === 'game-arena') {
-            if (!this.gameEngine || (this.gameEngine && typeof this.gameEngine.isDestroyed === 'function' && this.gameEngine.isDestroyed())) {
-                this.initializeGame();
-            } else if (this.gameEngine && this.gameEngine.isPaused) {
-                // GameEngine.resume() or togglePause() should handle pause menu visibility.
-            }
-        } else if (screenId === 'bot-builder') {
-            this.initializeBotBuilder();
+            console.log("[APP] Screen is 'game-arena', calling initializeGame().");
+            // Ensure this.initializeGame() is robust and logs its own progress/errors
+            this.initializeGame();
         } else if (screenId === 'main-menu') {
-            if (this.gameEngine && typeof this.gameEngine.destroy === 'function' && (typeof this.gameEngine.isDestroyed !== 'function' || !this.gameEngine.isDestroyed())) {
-                this.gameEngine.destroy();
-                this.gameEngine = null;
+            console.log("[APP] Screen is 'main-menu'. Destroying gameEngine if it exists.");
+            if (this.gameEngine && typeof this.gameEngine.destroy === 'function') {
+                // Check if it's already destroyed to avoid errors
+                if (typeof this.gameEngine.isDestroyed !== 'function' || !this.gameEngine.isDestroyed()) {
+                    this.gameEngine.destroy();
+                }
+                this.gameEngine = null; // Clear reference
+                console.log("[APP] Game engine destroyed.");
             }
             this.isGamePaused = false;
             this.cameFromPauseMenu = false;
+        } else if (screenId === 'settings') {
+            console.log("[APP] Screen is 'settings'.");
+            // Settings specific setup if any, e.g., populating fields from this.settings
+            // this.populateSettingsScreen(); // Example if needed
+        } else if (screenId === 'bot-builder') {
+            console.log("[APP] Screen is 'bot-builder', calling initializeBotBuilder().");
+            this.initializeBotBuilder();
         }
+        // Add other essential screen logic if needed for testing this path
 
-        this.updateControlSchemeVisuals();
+        // If loading screen was active and we're moving to another screen, ensure it's hidden.
+        const loadingScreen = document.getElementById('loading-screen');
+        if (screenId !== 'loading-screen' && loadingScreen && loadingScreen.classList.contains('active')) {
+            loadingScreen.style.display = 'none';
+            loadingScreen.classList.remove('active');
+            console.log("[APP] Loading screen explicitly hidden.");
+        }
+        console.log(`[APP] Current screen is now: ${this.currentScreen}`);
     }
 
     async startQuickBattle() {
-        this.showScreen('game-arena'); // initializeGame will be called by showScreen
-        // this.audioManager.playSound('battle-start'); // Sound might be better timed after game loads or countdown
+        console.log('[APP] startQuickBattle called.');
+        // The actual game start is handled by initializeGame called from showScreen('game-arena')
+        this.showScreen('game-arena');
+        // Audio play can remain if it's not causing issues
+        this.audioManager.playSound('battle-start');
     }
 
     async initializeGame() {
+        console.log('[APP] initializeGame called.');
         if (this.gameEngine && typeof this.gameEngine.destroy === 'function' && (typeof this.gameEngine.isDestroyed !== 'function' || !this.gameEngine.isDestroyed())) {
             this.gameEngine.destroy();
             this.gameEngine = null;
