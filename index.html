@@ -1,0 +1,241 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#00ffff">
+    <title>Battle Bots Arena - Mobile Combat</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="manifest" href="manifest.json">
+</head>
+<body>
+    <div id="app">
+        <!-- Loading Screen -->
+        <div id="loading-screen" class="screen active">
+            <div class="loading-content">
+                <div class="cyber-logo">
+                    <div class="logo-text">BATTLE BOTS</div>
+                    <div class="logo-subtitle">ARENA</div>
+                </div>
+                <div class="loading-bar">
+                    <div class="loading-progress"></div>
+                </div>
+                <div class="loading-text">Initializing Combat Systems...</div>
+            </div>
+        </div>
+
+        <!-- Main Menu -->
+        <div id="main-menu" class="screen active">
+            <div class="menu-header">
+                <h1 class="game-title">BATTLE BOTS</h1>
+                <div class="subtitle">MOBILE ARENA</div>
+            </div>
+            <div class="menu-buttons">
+                <button class="menu-btn primary" data-action="quick-battle">
+                    <span class="btn-icon">⚡</span>
+                    <span class="btn-text">Quick Battle</span>
+                    <span class="btn-subtitle">2-min combat</span>
+                </button>
+                <button class="menu-btn" data-action="bot-builder">
+                    <span class="btn-icon">🔧</span>
+                    <span class="btn-text">Bot Builder</span>
+                    <span class="btn-subtitle">Customize</span>
+                </button>
+                <button class="menu-btn" data-action="settings">
+                    <span class="btn-icon">⚙️</span>
+                    <span class="btn-text">Settings</span>
+                    <span class="btn-subtitle">Controls & Graphics</span>
+                </button>
+            </div>
+            <div class="menu-footer">
+                <div class="connection-status">
+                    <span class="status-dot offline"></span>
+                    <span class="status-text">Offline Ready</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bot Builder -->
+        <div id="bot-builder" class="screen">
+            <div class="builder-header">
+                <button class="back-btn" data-action="back">←</button>
+                <h2>Bot Builder</h2>
+                <button class="save-btn" data-action="save-bot">Save</button>
+            </div>
+            <div class="builder-content">
+                <div class="builder-canvas">
+                    <canvas id="builder-canvas"></canvas>
+                    <div class="builder-controls">
+                        <button class="builder-btn" data-action="rotate-left">↻</button>
+                        <button class="builder-btn" data-action="rotate-right">↺</button>
+                        <button class="builder-btn" data-action="reset">Reset</button>
+                    </div>
+                </div>
+                <div class="parts-panel">
+                    <div class="parts-categories">
+                        <button class="category-btn active" data-category="chassis">Chassis</button>
+                        <button class="category-btn" data-category="weapons">Weapons</button>
+                        <button class="category-btn" data-category="armor">Armor</button>
+                    </div>
+                    <div class="parts-grid" id="parts-grid">
+                        <!-- Parts will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Arena -->
+        <div id="game-arena" class="screen">
+            <div class="game-hud">
+                <div class="hud-top">
+                    <div class="player-info">
+                        <div class="health-bar">
+                            <div class="health-fill" id="player-health"></div>
+                            <span class="health-text">100</span>
+                        </div>
+                        <div class="energy-bar">
+                            <div class="energy-fill" id="player-energy"></div>
+                        </div>
+                    </div>
+                    <div class="game-timer" id="game-timer">2:00</div>
+                    <div class="enemy-info">
+                        <div class="health-bar">
+                            <div class="health-fill" id="enemy-health"></div>
+                            <span class="health-text">100</span>
+                        </div>
+                    </div>
+                </div>
+                <button class="pause-btn" id="pause-btn">⏸️</button>
+            </div>
+            
+            <div class="game-canvas-container">
+                <canvas id="game-canvas"></canvas>
+                <div class="camera-controls">
+                    <div class="zoom-indicator" id="zoom-indicator">1.0x</div>
+                </div>
+            </div>
+
+            <div class="game-controls">
+                <div class="left-controls">
+                    <div class="virtual-joystick" id="movement-joystick">
+                        <div class="joystick-base">
+                            <div class="joystick-stick"></div>
+                        </div>
+                        <div class="joystick-label">MOVE</div>
+                    </div>
+                </div>
+                <div class="right-controls">
+                    <div class="action-buttons">
+                        <button class="action-btn primary" id="fire-btn">
+                            <span class="btn-icon">🔥</span>
+                        </button>
+                        <button class="action-btn secondary" id="special-btn">
+                            <span class="btn-icon">⚡</span>
+                        </button>
+                        <button class="action-btn" id="shield-btn">
+                            <span class="btn-icon">🛡️</span>
+                        </button>
+                    </div>
+                    <div class="targeting-area" id="targeting-area">
+                        <div class="targeting-crosshair"></div>
+                        <div class="targeting-label">TAP TO TARGET</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings -->
+        <div id="settings" class="screen">
+            <div class="settings-header">
+                <button class="back-btn" data-action="back">←</button>
+                <h2>Settings</h2>
+            </div>
+            <div class="settings-content">
+                <div class="settings-section">
+                    <h3>Graphics</h3>
+                    <div class="setting-item">
+                        <label>Quality</label>
+                        <select id="quality-setting">
+                            <option value="low">Battery Saver</option>
+                            <option value="medium" selected>Balanced</option>
+                            <option value="high">High Quality</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>Frame Rate</label>
+                        <select id="framerate-setting">
+                            <option value="30">30 FPS</option>
+                            <option value="60" selected>60 FPS</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h3>Controls</h3>
+                    <div class="setting-item">
+                        <label>Haptic Feedback</label>
+                        <input type="checkbox" id="haptic-setting" checked>
+                    </div>
+                    <div class="setting-item">
+                        <label>Joystick Sensitivity</label>
+                        <input type="range" id="sensitivity-setting" min="0.5" max="2" step="0.1" value="1">
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h3>Audio</h3>
+                    <div class="setting-item">
+                        <label>Master Volume</label>
+                        <input type="range" id="volume-setting" min="0" max="1" step="0.1" value="0.7">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Over -->
+        <div id="game-over" class="screen overlay">
+            <div class="game-over-content">
+                <div class="result-text" id="result-text">VICTORY!</div>
+                <div class="stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Time</span>
+                        <span class="stat-value" id="final-time">1:23</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Damage Dealt</span>
+                        <span class="stat-value" id="damage-dealt">85</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Accuracy</span>
+                        <span class="stat-value" id="accuracy">67%</span>
+                    </div>
+                </div>
+                <div class="game-over-buttons">
+                    <button class="menu-btn" data-action="play-again">Play Again</button>
+                    <button class="menu-btn secondary" data-action="main-menu">Main Menu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Map -->
+    <script type="importmap">
+    {
+        "imports": {
+            "cannon": "https://cdn.skypack.dev/cannon@0.20.0",
+            "dexie": "https://cdn.skypack.dev/dexie@3.2.4",
+            "nipplejs": "https://cdn.skypack.dev/nipplejs@0.10.1",
+            "bot-builder": "./bot-builder.js"
+        }
+    }
+    </script>
+
+    <!-- Scripts -->
+    <script type="module" src="storage.js"></script>
+    <script type="module" src="audio.js"></script>
+    <script type="module" src="physics.js"></script>
+    <script type="module" src="controls.js"></script>
+    <script type="module" src="bot-builder.js"></script>
+    <script type="module" src="game.js"></script>
+    <script type="module" src="app.js"></script>
+</body>
+</html>
