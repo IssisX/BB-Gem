@@ -1,0 +1,75 @@
+[
+    {
+        "id": "weapon_blaster_small",
+        "name": "Small Blaster",
+        "category": "weapon",
+        "type": "small_weapon",
+        "sprite": "sprites/blaster_small.png",
+        "description": "A standard energy blaster, reliable and efficient.",
+        "render": {
+            "shape": "rectangle_projectile", "color": "#FFFF00",
+            "width": 6, "height": 12, "glowColor": "#FFFF00", "glowSize": 6
+        },
+        "stats": {
+            "damage": 8,
+            "fireRate": 4,
+            "projectileSpeed": 25,
+            "projectileSize": 6,
+            "projectileColor": "#FFFF00",
+            "projectileLifetime": 1.5,
+            "energyCost": 4,
+            "spread": 5
+        },
+        "muzzleOffset": {"x": 0, "y": -10, "z": 0},
+        "sound_fire": "shoot_blaster_small"
+    },
+    {
+        "id": "weapon_plasma_cannon",
+        "name": "Plasma Cannon",
+        "category": "weapon",
+        "type": "medium_weapon",
+        "sprite": "sprites/plasma_cannon.png",
+        "description": "Fires slower, high-damage plasma bolts.",
+        "render": {
+            "shape": "circle", "color": "#00FF00",
+            "glowColor": "#33FF33", "glowSize": 10
+        },
+        "stats": {
+            "damage": 25,
+            "fireRate": 1.5,
+            "projectileSpeed": 18,
+            "projectileSize": 10,
+            "projectileColor": "#00FF00",
+            "projectileLifetime": 2.0,
+            "energyCost": 15,
+            "spread": 2
+        },
+        "muzzleOffset": {"x": 0, "y": -15, "z": 0},
+        "sound_fire": "shoot_plasma_cannon"
+    },
+    {
+        "id": "weapon_laser_beam",
+        "name": "Laser Beam",
+        "category": "weapon",
+        "type": "heavy_weapon",
+        "sprite": "sprites/laser_beam_emitter.png",
+        "description": "A continuous laser beam that drains energy quickly.",
+        "render": {
+            "shape": "beam", "color": "#FF0000", "width": 4, "maxLength": 500,
+            "glowColor": "#FF3333", "glowSize": 5
+        },
+        "stats": {
+            "damage": 3,      // Damage per tick or per 0.1s
+            "fireRate": 20,     // Ticks per second
+            "projectileSpeed": 0, // Beam is instant
+            "projectileSize": 0,  // Not applicable for beam shape
+            "projectileColor": "#FF0000", // Beam color
+            "projectileLifetime": 0.05, // Duration of a single damage tick "hit"
+            "energyCost": 2,    // Energy per tick
+            "isBeam": true      // Special flag for beam weapon handling
+        },
+        "muzzleOffset": {"x": 0, "y": -20, "z": 0},
+        "sound_fire": "shoot_laser_beam_loop", // Looping sound
+        "sound_stop": "shoot_laser_beam_end"
+    }
+]

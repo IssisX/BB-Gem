@@ -1,0 +1,45 @@
+[
+    {
+        "id": "chassis_light",
+        "name": "Light Frame",
+        "category": "chassis",
+        "sprite": "sprites/chassis_light.png",
+        "description": "A nimble frame, prioritizing speed and energy over raw defense.",
+        "stats": {
+            "baseHealth": 75,
+            "baseEnergy": 100,
+            "maxSpeed": 7,
+            "accelerationForce": 32000,
+            "mass": 80,
+            "linearDamping": 0.7,
+            "angularDamping": 0.7,
+            "turnSpeed": 0.15
+        },
+        "attachmentPoints": {
+            "weaponSlot1": {"x": 0, "y": -10, "allowedTypes": ["small_weapon", "medium_weapon"], "defaultRotation": 0},
+            "armorSlot1": {"x": 0, "y": 0, "allowedTypes": ["plating"]}
+        }
+    },
+    {
+        "id": "chassis_medium",
+        "name": "Medium Frame",
+        "category": "chassis",
+        "sprite": "sprites/chassis_medium.png",
+        "description": "A balanced frame offering a good mix of durability and mobility.",
+        "stats": {
+            "baseHealth": 100,
+            "baseEnergy": 80,
+            "maxSpeed": 6,
+            "accelerationForce": 30000,
+            "mass": 100,
+            "linearDamping": 0.8,
+            "angularDamping": 0.8,
+            "turnSpeed": 0.1
+        },
+        "attachmentPoints": {
+            "weaponSlot1": {"x": 0, "y": -12, "allowedTypes": ["medium_weapon", "heavy_weapon"], "defaultRotation": 0},
+            "weaponSlot2": {"x": 0, "y": 12, "allowedTypes": ["small_weapon"], "defaultRotation": 0.5},
+            "armorSlot1": {"x": 0, "y": 0, "allowedTypes": ["plating", "shield_emitter"]}
+        }
+    }
+]

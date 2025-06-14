@@ -7,14 +7,29 @@
 // We provide a shim so legacy calls to .add continue to work *and*
 // migrate all internal usages to the new canonical .addBody().
 
-import * as CANNON from 'https://cdn.skypack.dev/cannon-es@0.20.0';
+import * as CANNON from 'cannon-es'; // Changed from CDN URL
 
 export class PhysicsEngine {
   constructor() {
     this.world = new CANNON.World({
-      gravity: new CANNON.Vec3(0, -9.82, 0),
+      gravity: new CANNON.Vec3(0, 0, 0), // Assuming top-down 2D, so no gravity in Y or Z
     });
-    this.world.broadphase = new CANNON.NaiveBroadphase();
+    this.world.broadphase = new CANNON.NaiveBroadphase(); // Good default
+
+    // Configure default contact material
+    const defaultMaterial = new CANNON.Material('default');
+    const defaultContactMaterial = new CANNON.ContactMaterial(
+        defaultMaterial,
+        defaultMaterial,
+        {
+            friction: 0.1,      // Low friction
+            restitution: 0.25   // Some bounciness
+        }
+    );
+    this.world.defaultContactMaterial = defaultContactMaterial;
+    // Individual bodies will need their material set to 'defaultMaterial'
+    // or a specific material if they need different properties.
+    // This is handled in createBot in GameEngine.js by assigning materials.
 
     // **Compatibility shim** — map deprecated .add to .addBody
     if (typeof this.world.add !== 'function') {

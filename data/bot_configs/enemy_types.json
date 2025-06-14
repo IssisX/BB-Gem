@@ -1,0 +1,44 @@
+[
+    {
+        "botConfigId": "enemy_grunt_blaster_v1",
+        "name": "Grunt Blaster",
+        "description": "Standard combat unit, equipped with a basic blaster. Weak armor but numerous.",
+        "chassisId": "chassis_light",
+        "weaponIds": ["weapon_blaster_small"],
+        "armorId": "armor_plating_light",
+        "engineId": null,
+        "aiBehaviorHint": "aggressive_ranged_simple",
+        "cosmeticOverrides": {
+            "primaryColor": "#FF5733",
+            "chassisSprite": "sprites/enemy_chassis_light_skin_red.png"
+        }
+    },
+    {
+        "botConfigId": "enemy_heavy_plasma_v1",
+        "name": "Heavy Plasma Guard",
+        "description": "Slower but heavily armored, wielding a powerful plasma cannon. Keeps distance.",
+        "chassisId": "chassis_medium",
+        "weaponIds": ["weapon_plasma_cannon"],
+        "armorId": "armor_plating_medium",
+        "engineId": null,
+        "aiBehaviorHint": "defensive_ranged_heavy",
+        "cosmeticOverrides": {
+            "primaryColor": "#C70039",
+            "chassisSprite": "sprites/enemy_chassis_medium_skin_crimson.png"
+        }
+    },
+    {
+        "botConfigId": "enemy_sniper_laser_v1",
+        "name": "Laser Sniper",
+        "description": "Utilizes a long-range laser beam. Attempts to maintain maximum range.",
+        "chassisId": "chassis_light",
+        "weaponIds": ["weapon_laser_beam"],
+        "armorId": "armor_plating_light",
+        "engineId": "engine_standard_mk1",
+        "aiBehaviorHint": "sniper_long_range_cautious",
+        "cosmeticOverrides": {
+            "primaryColor": "#9A12B3",
+            "chassisSprite": "sprites/enemy_chassis_light_skin_purple.png"
+        }
+    }
+]

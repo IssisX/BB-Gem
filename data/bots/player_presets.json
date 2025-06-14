@@ -1,0 +1,26 @@
+[
+    {
+        "botId": "player_starter_balanced",
+        "name": "Balanced Starter Bot",
+        "description": "A versatile bot to begin your journey, offering a mix of offense and defense.",
+        "chassisId": "chassis_medium",
+        "weaponIds": ["weapon_blaster_small"],
+        "armorId": "armor_plating_medium",
+        "engineId": null,
+        "cosmeticOverrides": {
+            "primaryColor": "#00CCFF"
+        }
+    },
+    {
+        "botId": "player_light_scout",
+        "name": "Light Scout",
+        "description": "Fast and agile, designed for quick strikes and reconnaissance.",
+        "chassisId": "chassis_light",
+        "weaponIds": ["weapon_blaster_small"],
+        "armorId": "armor_plating_light",
+        "engineId": "engine_standard_mk1",
+        "cosmeticOverrides": {
+            "primaryColor": "#39FF14"
+        }
+    }
+]

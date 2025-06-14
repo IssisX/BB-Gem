@@ -1,9 +1,10 @@
 import nipplejs from 'nipplejs';
 
 export class ControlsManager {
-    constructor(gameEngine, settings) {
+    constructor(gameEngine, settings, onInputTypeChangeCallback = null) { // Added callback
         this.gameEngine = gameEngine;
         this.settings = settings;
+        this.onInputTypeChange = onInputTypeChangeCallback; // Store the callback
         this.joystick = null;
         this.targetingActive = false;
         this.lastTargetPosition = { x: 0, y: 0 };
@@ -18,11 +19,84 @@ export class ControlsManager {
             targeting: { x: 0, y: 0 },
             firing: false,
             special: false,
-            shield: false
+            shield: false,
+            // Gesture states
+            swipeUp: false,
+            swipeDown: false,
+            swipeLeft: false,
+            swipeRight: false,
+            doubleTap: false // Existing double tap can also update this
         };
+        this.swipeThreshold = 50; // Minimum distance for a swipe
+        this.swipeTimeThreshold = 300; // Maximum time in ms for a swipe
+        this.touchStartTime = 0;
+        this.touchStartPos = { x: 0, y: 0 };
+
+        // Gamepad properties
+        this.gamepad = null;
+        this.gamepadPollInterval = null;
+        this.gamepadButtonStates = {}; // To track button presses/releases
+        this.gamepadAxisDeadZone = 0.2;
+        this.gamepadSensitivity = 1.0;
+
+        this.lastInputType = 'keyboard'; // Default or detect initial state
+        if (typeof window !== 'undefined' && 'ontouchstart' in window) {
+            this.lastInputType = 'touch';
+        }
         
         this.init();
     }
+
+    setActiveInputType(newType) {
+        if (this.lastInputType !== newType) {
+            this.lastInputType = newType;
+            if (this.onInputTypeChange) {
+                this.onInputTypeChange(newType);
+            }
+        }
+    }
+
+    getActiveInputType() {
+        // This method is called by app.js to update UI visuals.
+        // It prioritizes gamepad if any activity is detected on it.
+        if (this.gamepad) {
+            const gp = navigator.getGamepads()[this.gamepad.index];
+            if (gp) {
+                const isActiveGamepad = gp.buttons.some(b => b.pressed || b.touched) ||
+                                      gp.axes.some(a => Math.abs(a) > this.gamepadAxisDeadZone);
+                if (isActiveGamepad) {
+                    this.setActiveInputType('gamepad'); // Use setter to potentially trigger callback
+                    return 'gamepad';
+                }
+            }
+        }
+        return this.lastInputType;
+    }
+
+    // app.js would have something like:
+    // updateControlSchemeVisuals() {
+    //   const activeType = this.controlsManager.getActiveInputType();
+    //   document.body.classList.remove('touch-controls-active', 'keyboard-controls-active', 'gamepad-controls-active');
+    //   const instructionsDiv = document.getElementById('kb-gp-instructions');
+    //   instructionsDiv.style.display = 'none';
+    //   instructionsDiv.classList.remove('keyboard', 'gamepad');
+
+    //   if (activeType === 'touch') {
+    //     document.body.classList.add('touch-controls-active');
+    //   } else if (activeType === 'keyboard') {
+    //     document.body.classList.add('keyboard-controls-active');
+    //     instructionsDiv.textContent = "Use WASD/Arrows to Move, Space to Fire, E for Special, Q for Shield.";
+    //     instructionsDiv.classList.add('keyboard');
+    //     instructionsDiv.style.display = 'block';
+    //   } else if (activeType === 'gamepad') {
+    //     document.body.classList.add('gamepad-controls-active');
+    //     instructionsDiv.textContent = "Gamepad Connected: Use Left Stick to Move, Buttons to Fire/Use Abilities.";
+    //     instructionsDiv.classList.add('gamepad');
+    //     instructionsDiv.style.display = 'block';
+    //   }
+    // }
+    // And this method would be called on init and potentially on an event from ControlsManager
+    // if lastInputType changes significantly (e.g., from touch to keyboard).
 
     init() {
         this.setupVirtualJoystick();
@@ -30,6 +104,7 @@ export class ControlsManager {
         this.setupTargeting();
         this.setupGestureControls();
         this.setupKeyboardControls();
+        this.setupGamepadControls(); // Initialize gamepad controls
     }
 
     setupVirtualJoystick() {
@@ -48,6 +123,7 @@ export class ControlsManager {
         });
 
         this.joystick.on('move', (evt, data) => {
+            this.setActiveInputType('touch');
             if (data.force < 0.1) {
                 this.inputState.movement = { x: 0, y: 0 };
                 return;
@@ -64,6 +140,7 @@ export class ControlsManager {
         });
 
         this.joystick.on('end', () => {
+            this.setActiveInputType('touch');
             this.inputState.movement = { x: 0, y: 0 };
         });
     }
@@ -73,48 +150,56 @@ export class ControlsManager {
         const specialBtn = document.getElementById('special-btn');
         const shieldBtn = document.getElementById('shield-btn');
 
-        // Fire button - continuous firing while held
-        fireBtn.addEventListener('touchstart', (e) => {
+        const handleTouchStart = (e, buttonElement, action) => {
             e.preventDefault();
+            this.setActiveInputType('touch');
+            action();
+            this.addButtonPressEffect(buttonElement);
+        };
+
+        const handleTouchEnd = (e, buttonElement, action) => {
+            e.preventDefault();
+            this.setActiveInputType('touch');
+            if (action) action();
+            this.removeButtonPressEffect(buttonElement);
+        };
+
+        // Fire button
+        fireBtn.addEventListener('touchstart', (e) => handleTouchStart(e, fireBtn, () => {
             this.inputState.firing = true;
-            this.addButtonPressEffect(fireBtn);
-            this.gameEngine.audioManager.playSound('shoot');
-        });
-
-        fireBtn.addEventListener('touchend', (e) => {
-            e.preventDefault();
+            if (this.gameEngine.audioManager) this.gameEngine.audioManager.playSound('shoot');
+        }));
+        fireBtn.addEventListener('touchend', (e) => handleTouchEnd(e, fireBtn, () => {
             this.inputState.firing = false;
-            this.removeButtonPressEffect(fireBtn);
-        });
+        }));
 
-        // Special ability - single activation
-        specialBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (!this.inputState.special) {
+        // Special ability button
+        specialBtn.addEventListener('touchstart', (e) => handleTouchStart(e, specialBtn, () => {
+            if (!this.inputState.special) { // Prevent re-triggering if already active from another source
                 this.inputState.special = true;
-                this.addButtonPressEffect(specialBtn);
-                this.gameEngine.audioManager.playSound('powerup');
-                
-                // Reset after a short delay
+                if (this.gameEngine.audioManager) this.gameEngine.audioManager.playSound('powerup');
+                // Reset after a short delay, PlayerInputSystem will consume it
                 setTimeout(() => {
                     this.inputState.special = false;
-                    this.removeButtonPressEffect(specialBtn);
+                    // Check if button is still held for visual effect, though this timeout is for action state
+                    if (!e.target.classList.contains('active-persistent')) { // Example class for persistent active look
+                         this.removeButtonPressEffect(specialBtn);
+                    }
                 }, 200);
             }
-        });
+        }));
+        // No specific touchend action for special if it's a one-shot
 
-        // Shield - toggle on/off
-        shieldBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            this.inputState.shield = !this.inputState.shield;
-            
+        // Shield button
+        shieldBtn.addEventListener('touchstart', (e) => handleTouchStart(e, shieldBtn, () => {
+            this.inputState.shield = !this.inputState.shield; // Toggle shield state
             if (this.inputState.shield) {
-                this.addButtonPressEffect(shieldBtn, true);
-                this.gameEngine.audioManager.playSound('powerup');
+                this.addButtonPressEffect(shieldBtn, true); // Make effect persistent if shield is ON
+                if (this.gameEngine.audioManager) this.gameEngine.audioManager.playSound('powerup');
             } else {
-                this.removeButtonPressEffect(shieldBtn);
+                this.removeButtonPressEffect(shieldBtn); // Remove persistent effect if shield is OFF
             }
-        });
+        }));
     }
 
     setupTargeting() {
@@ -124,55 +209,70 @@ export class ControlsManager {
         // Targeting area touch
         targetingArea.addEventListener('touchstart', (e) => {
             e.preventDefault();
+            this.setActiveInputType('touch');
             this.targetingActive = true;
             this.addButtonPressEffect(targetingArea);
         });
 
         targetingArea.addEventListener('touchend', (e) => {
             e.preventDefault();
+            this.setActiveInputType('touch');
             this.targetingActive = false;
             this.removeButtonPressEffect(targetingArea);
         });
 
-        // Canvas tap-to-target
-        gameCanvas.addEventListener('touchstart', (e) => {
+        const tapTargetHandler = (e) => {
             if (e.touches.length === 1) {
+                 this.setActiveInputType('touch');
                 const touch = e.touches[0];
                 const rect = gameCanvas.getBoundingClientRect();
                 const x = touch.clientX - rect.left;
                 const y = touch.clientY - rect.top;
                 
-                // Convert screen coordinates to game coordinates
-                const gameX = (x / rect.width) * gameCanvas.width;
+                const gameX = (x / rect.width) * gameCanvas.width; // These are canvas pixel coords
                 const gameY = (y / rect.height) * gameCanvas.height;
                 
-                this.inputState.targeting = { x: gameX, y: gameY };
-                this.lastTargetPosition = { x: gameX, y: gameY };
+                // Convert to world coordinates
+                const cam = this.gameEngine.camera;
+                const worldX = (gameX / window.devicePixelRatio - (rect.width / 2)) / cam.zoom + cam.currentX;
+                const worldY = (gameY / window.devicePixelRatio - (rect.height / 2)) / cam.zoom + cam.currentY;
+
+                this.inputState.targeting = { x: worldX, y: worldY };
+                this.lastTargetPosition = { x: worldX, y: worldY };
                 
-                // Visual feedback
                 this.showTargetingFeedback(x, y);
             }
-        });
+        };
+        // gameCanvas.addEventListener('touchstart', tapTargetHandler); // This might be duplicative with gesture's touchstart
+
     }
 
     setupGestureControls() {
         const gameCanvas = document.getElementById('game-canvas');
         let lastTouchTime = 0;
+        // gameCanvasSwipeStartX,Y,TouchStartTime are now this.touchStartPos.x, .y and this.touchStartTime
+        // to unify swipe detection logic for canvas.
 
-        // Pinch-to-zoom
         gameCanvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
+            this.setActiveInputType('touch');
             
-            if (e.touches.length === 2) {
-                // Start pinch gesture
+            if (e.touches.length === 2) { // Pinch
                 const touch1 = e.touches[0];
                 const touch2 = e.touches[1];
                 this.gestureStartDistance = this.getTouchDistance(touch1, touch2);
+                this.touchStartTime = 0; // Invalidate swipe/tap start time if pinch starts
             } else if (e.touches.length === 1) {
-                // Check for double-tap
+                const touch = e.touches[0];
+                this.touchStartPos = { x: touch.clientX, y: touch.clientY };
+                this.touchStartTime = Date.now();
+
+                // Double-tap detection
                 const currentTime = Date.now();
-                if (currentTime - lastTouchTime < 300) {
-                    this.handleDoubleTap(e.touches[0]);
+                if (currentTime - lastTouchTime < this.swipeTimeThreshold) {
+                    this.handleDoubleTap(touch);
+                    this.inputState.doubleTap = true;
+                    this.touchStartTime = 0; // Prevent swipe detection after a double tap
                 }
                 lastTouchTime = currentTime;
             }
@@ -180,117 +280,143 @@ export class ControlsManager {
 
         gameCanvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
-            
-            if (e.touches.length === 2) {
-                // Handle pinch zoom
+            this.setActiveInputType('touch');
+            if (e.touches.length === 2) { // Pinch-zoom
                 const touch1 = e.touches[0];
                 const touch2 = e.touches[1];
                 const currentDistance = this.getTouchDistance(touch1, touch2);
                 const zoomDelta = currentDistance / this.gestureStartDistance;
-                
                 this.handleZoom(zoomDelta);
                 this.gestureStartDistance = currentDistance;
             }
         });
-
-        // Swipe navigation (when not in game)
-        let swipeStartX = 0;
-        let swipeStartY = 0;
         
-        document.addEventListener('touchstart', (e) => {
-            if (e.touches.length === 1) {
-                swipeStartX = e.touches[0].clientX;
-                swipeStartY = e.touches[0].clientY;
+        gameCanvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            this.setActiveInputType('touch');
+            if (e.changedTouches.length === 1 && this.touchStartTime > 0) {
+                const touch = e.changedTouches[0];
+                const swipeEndX = touch.clientX;
+                const swipeEndY = touch.clientY;
+                const swipeTime = Date.now() - this.touchStartTime;
+
+                const deltaX = swipeEndX - this.touchStartPos.x;
+                const deltaY = swipeEndY - this.touchStartPos.y;
+                const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+                if (swipeTime < this.swipeTimeThreshold && distance > this.swipeThreshold) {
+                    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                        if (deltaX > 0) this.inputState.swipeRight = true;
+                        else this.inputState.swipeLeft = true;
+                    } else {
+                        if (deltaY > 0) this.inputState.swipeDown = true;
+                        else this.inputState.swipeUp = true;
+                    }
+                    this.resetGestureStatesAfterDelay();
+                }
             }
+            this.touchStartTime = 0;
         });
 
+        // Document-level swipe for UI (remains unchanged but shown for context)
+        // If game-canvas swipes should also trigger those general gameEngine events,
+        // then call this.handleSwipe(deltaX, deltaY) here too.
+        // For now, focusing on updating inputState for PlayerInputSystem.
+        let docSwipeStartX = 0;
+        let docSwipeStartY = 0;
+        document.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1 && !e.target.closest('#game-area-container')) { // Only outside game area
+                docSwipeStartX = e.touches[0].clientX;
+                docSwipeStartY = e.touches[0].clientY;
+                this.touchStartTime = Date.now(); // For general swipe time
+            }
+        });
         document.addEventListener('touchend', (e) => {
-            if (e.changedTouches.length === 1) {
+            if (e.changedTouches.length === 1 && !e.target.closest('#game-area-container')) {
                 const swipeEndX = e.changedTouches[0].clientX;
                 const swipeEndY = e.changedTouches[0].clientY;
+                const swipeTime = Date.now() - this.touchStartTime;
                 
-                const deltaX = swipeEndX - swipeStartX;
-                const deltaY = swipeEndY - swipeStartY;
+                const deltaX = swipeEndX - docSwipeStartX;
+                const deltaY = swipeEndY - docSwipeStartY;
                 
-                // Only process swipes outside the game area
-                if (!e.target.closest('#game-canvas')) {
-                    this.handleSwipe(deltaX, deltaY);
+                if (swipeTime < this.swipeTimeThreshold && (Math.abs(deltaX) > this.swipeThreshold || Math.abs(deltaY) > this.swipeThreshold)) {
+                     this.handleSwipe(deltaX, deltaY); // This emits gameEngine events
                 }
             }
         });
     }
 
+    resetGestureStatesAfterDelay() {
+        // Reset swipe flags after a short delay to allow systems to pick them up
+        // Alternatively, systems consuming them can reset them.
+        setTimeout(() => {
+            this.inputState.swipeUp = false;
+            this.inputState.swipeDown = false;
+            this.inputState.swipeLeft = false;
+            this.inputState.swipeRight = false;
+            this.inputState.doubleTap = false; // Reset doubleTap too
+        }, 50); // 50ms should be enough for one game tick
+    }
+
+
     setupKeyboardControls() {
-        // Desktop fallback controls
-        if (!('ontouchstart' in window)) {
-            document.addEventListener('keydown', (e) => {
-                switch (e.code) {
-                    case 'KeyW':
-                    case 'ArrowUp':
-                        this.inputState.movement.y = -1;
-                        break;
-                    case 'KeyS':
-                    case 'ArrowDown':
-                        this.inputState.movement.y = 1;
-                        break;
-                    case 'KeyA':
-                    case 'ArrowLeft':
-                        this.inputState.movement.x = -1;
-                        break;
-                    case 'KeyD':
-                    case 'ArrowRight':
-                        this.inputState.movement.x = 1;
-                        break;
-                    case 'Space':
-                        e.preventDefault();
-                        this.inputState.firing = true;
-                        break;
-                    case 'KeyE':
-                        this.inputState.special = true;
-                        break;
-                    case 'KeyQ':
-                        this.inputState.shield = !this.inputState.shield;
-                        break;
-                }
-            });
+        this.activeKeys = new Set();
+        this.keyPressProcessed = new Set();
 
-            document.addEventListener('keyup', (e) => {
-                switch (e.code) {
-                    case 'KeyW':
-                    case 'KeyS':
-                    case 'ArrowUp':
-                    case 'ArrowDown':
-                        this.inputState.movement.y = 0;
-                        break;
-                    case 'KeyA':
-                    case 'KeyD':
-                    case 'ArrowLeft':
-                    case 'ArrowRight':
-                        this.inputState.movement.x = 0;
-                        break;
-                    case 'Space':
-                        e.preventDefault();
-                        this.inputState.firing = false;
-                        break;
-                    case 'KeyE':
-                        this.inputState.special = false;
-                        break;
-                }
-            });
+        document.addEventListener('keydown', (e) => {
+            this.setActiveInputType('keyboard');
+            this.activeKeys.add(e.code);
+            if (e.code === 'KeyQ' && !this.keyPressProcessed.has('KeyQ')) {
+                this.inputState.shield = !this.inputState.shield;
+                this.keyPressProcessed.add('KeyQ');
+            }
+            if (e.code === 'KeyE' && !this.keyPressProcessed.has('KeyE')) {
+                this.inputState.special = true;
+                this.keyPressProcessed.add('KeyE');
+                setTimeout(() => { this.inputState.special = false; this.keyPressProcessed.delete('KeyE'); }, 200);
+            }
+            if (e.code === 'Space') e.preventDefault();
+        });
 
-            // Mouse targeting
-            document.getElementById('game-canvas').addEventListener('click', (e) => {
+        document.addEventListener('keyup', (e) => {
+            this.setActiveInputType('keyboard');
+            this.activeKeys.delete(e.code);
+            this.keyPressProcessed.delete(e.code);
+            if (e.code === 'Space') e.preventDefault();
+        });
+
+        document.getElementById('game-canvas').addEventListener('mousemove', (e) => {
+            if (this.lastInputType === 'keyboard' || !('ontouchstart' in window)) {
+                 this.setActiveInputType('keyboard'); // Mouse move implies keyboard/mouse usage
                 const rect = e.target.getBoundingClientRect();
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
-                
-                const gameX = (x / rect.width) * e.target.width;
-                const gameY = (y / rect.height) * e.target.height;
-                
-                this.inputState.targeting = { x: gameX, y: gameY };
-                this.lastTargetPosition = { x: gameX, y: gameY };
-            });
-        }
+                const gameX = (x / rect.width) * this.gameEngine.canvas.width / window.devicePixelRatio;
+                const gameY = (y / rect.height) * this.gameEngine.canvas.height / window.devicePixelRatio;
+                const cam = this.gameEngine.camera;
+                const worldX = (gameX - (rect.width / 2)) / cam.zoom + cam.currentX;
+                const worldY = (gameY - (rect.height / 2)) / cam.zoom + cam.currentY;
+                this.inputState.targeting = { x: worldX, y: worldY };
+                this.lastTargetPosition = { x: worldX, y: worldY };
+            }
+        });
+        document.getElementById('game-canvas').addEventListener('mousedown', (e) => {
+            if (this.lastInputType === 'keyboard' || !('ontouchstart' in window)) {
+                this.setActiveInputType('keyboard');
+                if (e.button === 0) {
+                    this.inputState.firing = true;
+                }
+            }
+        });
+        document.getElementById('game-canvas').addEventListener('mouseup', (e) => {
+            if (this.lastInputType === 'keyboard' || !('ontouchstart' in window)) {
+                 this.setActiveInputType('keyboard');
+                if (e.button === 0) {
+                    this.inputState.firing = false;
+                }
+            }
+        });
     }
 
     getTouchDistance(touch1, touch2) {
@@ -305,9 +431,10 @@ export class ControlsManager {
         
         if (newZoom !== this.currentZoom) {
             this.currentZoom = newZoom;
-            this.gameEngine.setZoom(this.currentZoom);
+            if (this.gameEngine && typeof this.gameEngine.setZoom === 'function') {
+                 this.gameEngine.setZoom(this.currentZoom);
+            }
             
-            // Update zoom indicator
             const zoomIndicator = document.getElementById('zoom-indicator');
             if (zoomIndicator) {
                 zoomIndicator.textContent = `${this.currentZoom.toFixed(1)}x`;
@@ -316,42 +443,24 @@ export class ControlsManager {
     }
 
     handleDoubleTap(touch) {
-        // Double-tap to activate special ability
-        if (!this.inputState.special) {
-            this.inputState.special = true;
-            this.gameEngine.audioManager.playSound('powerup');
-            
-            // Visual feedback at touch position
-            this.showDoubleTapFeedback(touch.clientX, touch.clientY);
-            
-            setTimeout(() => {
-                this.inputState.special = false;
-            }, 200);
-        }
+        // This method is called from canvas touchstart for double tap
+        // It sets this.inputState.doubleTap = true;
+        // PlayerInputSystem should react to this flag.
+        // Visual feedback:
+        this.showDoubleTapFeedback(touch.clientX, touch.clientY);
+        // The flag is reset in resetGestureStatesAfterDelay
     }
 
-    handleSwipe(deltaX, deltaY) {
-        const threshold = 50;
+    handleSwipe(deltaX, deltaY) { // This is for document-level swipes (UI navigation)
+        // const threshold = 50; // Now this.swipeThreshold
         
-        if (Math.abs(deltaX) > threshold || Math.abs(deltaY) > threshold) {
+        if (Math.abs(deltaX) > this.swipeThreshold || Math.abs(deltaY) > this.swipeThreshold) {
             if (Math.abs(deltaX) > Math.abs(deltaY)) {
-                // Horizontal swipe
-                if (deltaX > 0) {
-                    // Swipe right - next screen or action
-                    this.gameEngine.emit('swipeRight');
-                } else {
-                    // Swipe left - previous screen or back
-                    this.gameEngine.emit('swipeLeft');
-                }
+                if (deltaX > 0) this.gameEngine.emit('swipeRight');
+                else this.gameEngine.emit('swipeLeft');
             } else {
-                // Vertical swipe
-                if (deltaY > 0) {
-                    // Swipe down - menu or pause
-                    this.gameEngine.emit('swipeDown');
-                } else {
-                    // Swipe up - special action
-                    this.gameEngine.emit('swipeUp');
-                }
+                if (deltaY > 0) this.gameEngine.emit('swipeDown');
+                else this.gameEngine.emit('swipeUp');
             }
         }
     }
@@ -388,7 +497,6 @@ export class ControlsManager {
             animation: targeting-pulse 0.5s ease-out;
         `;
         
-        // Add animation keyframes
         if (!document.getElementById('targeting-feedback-styles')) {
             const style = document.createElement('style');
             style.id = 'targeting-feedback-styles';
@@ -404,7 +512,7 @@ export class ControlsManager {
         document.body.appendChild(feedback);
         
         setTimeout(() => {
-            document.body.removeChild(feedback);
+            if (feedback.parentElement) feedback.parentElement.removeChild(feedback);
         }, 500);
     }
 
@@ -425,7 +533,6 @@ export class ControlsManager {
             animation: doubletap-flash 0.8s ease-out;
         `;
         
-        // Add animation keyframes
         if (!document.getElementById('doubletap-feedback-styles')) {
             const style = document.createElement('style');
             style.id = 'doubletap-feedback-styles';
@@ -442,18 +549,122 @@ export class ControlsManager {
         document.body.appendChild(feedback);
         
         setTimeout(() => {
-            document.body.removeChild(feedback);
+            if (feedback.parentElement) feedback.parentElement.removeChild(feedback);
         }, 800);
     }
 
     getInputState() {
-        return { ...this.inputState };
+        // Update movement from activeKeys (for keyboard)
+        // This overwrites joystick movement if keys are pressed.
+        // A more sophisticated approach might merge or prioritize.
+        let moveX = this.inputState.movement.x; // Preserve joystick input if no keys pressed
+        let moveY = this.inputState.movement.y;
+
+        if (this.activeKeys.has('KeyW') || this.activeKeys.has('ArrowUp')) moveY = -1;
+        else if (this.activeKeys.has('KeyS') || this.activeKeys.has('ArrowDown')) moveY = 1;
+        else if (!this.joystick || this.joystick.get().force < 0.1) moveY = 0; // Stop if no joystick and no key
+
+        if (this.activeKeys.has('KeyA') || this.activeKeys.has('ArrowLeft')) moveX = -1;
+        else if (this.activeKeys.has('KeyD') || this.activeKeys.has('ArrowRight')) moveX = 1;
+        else if (!this.joystick || this.joystick.get().force < 0.1) moveX = 0;
+
+        const currentInputState = { ...this.inputState };
+        currentInputState.movement = { x: moveX, y: moveY };
+
+        // Update actions from activeKeys
+        currentInputState.firing = this.inputState.firing || this.activeKeys.has('Space');
+        // 'special' and 'shield' are handled by keydown/keyup for one-shot or toggle logic for keyboard.
+        // Touch buttons also update this.inputState directly.
+
+        // TODO: Gamepad input would also merge into currentInputState here.
+        if (this.gamepad) {
+            // Left stick for movement
+            const axes = this.gamepad.axes;
+            let stickX = axes[0];
+            let stickY = axes[1];
+
+            if (Math.abs(stickX) < this.gamepadAxisDeadZone) stickX = 0;
+            if (Math.abs(stickY) < this.gamepadAxisDeadZone) stickY = 0;
+
+            // If gamepad movement is active, it might override keyboard/joystick
+            // Or, sum them, or prioritize. For now, let's allow override if significant.
+            if (stickX !== 0 || stickY !== 0) {
+                 currentInputState.movement.x = stickX * this.gamepadSensitivity;
+                 currentInputState.movement.y = stickY * this.gamepadSensitivity; // Gamepad Y is often -1 up, 1 down
+            }
+
+            // Buttons
+            this.gamepad.buttons.forEach((button, index) => {
+                // Example mapping: Button 0 (A/X) for firing
+                if (index === 0) currentInputState.firing = button.pressed || currentInputState.firing; // Hold to fire
+
+                // Button 1 (B/Circle) for special (one-shot)
+                if (index === 1 && button.pressed && !this.gamepadButtonStates[index]) {
+                    currentInputState.special = true; // PlayerInputSystem should reset this
+                    setTimeout(() => { currentInputState.special = false; }, 200);
+                }
+                // Button 2 (X/Square) for shield (toggle)
+                if (index === 2 && button.pressed && !this.gamepadButtonStates[index]) {
+                    currentInputState.shield = !currentInputState.shield;
+                }
+                this.gamepadButtonStates[index] = button.pressed; // Store current state for next frame
+            });
+        }
+
+
+        return currentInputState;
+    }
+
+    setupGamepadControls() {
+        window.addEventListener('gamepadconnected', (e) => {
+            console.log('Gamepad connected:', e.gamepad);
+            this.gamepad = e.gamepad;
+            this.lastInputType = 'gamepad';
+        });
+
+        window.addEventListener('gamepaddisconnected', (e) => {
+            console.log('Gamepad disconnected:', e.gamepad);
+            if (this.gamepad && this.gamepad.index === e.gamepad.index) {
+                this.gamepad = null;
+                // Potentially revert to keyboard/touch if this was the active input
+                if (this.lastInputType === 'gamepad') {
+                    this.lastInputType = ('ontouchstart' in window) ? 'touch' : 'keyboard';
+                }
+            }
+        });
+
+        // Initial check for already connected gamepads
+        if (typeof navigator.getGamepads === "function") {
+            const gamepads = navigator.getGamepads();
+            if (gamepads && gamepads[0]) { // Use the first connected gamepad
+                 this.gamepad = gamepads[0];
+                 this.lastInputType = 'gamepad';
+                 console.log('Gamepad already connected:', this.gamepad);
+            }
+        }
+    }
+
+    getActiveInputType() {
+        // Check for recent gamepad activity if a gamepad is connected
+        if (this.gamepad) {
+            const isActiveGamepad = this.gamepad.buttons.some(b => b.pressed) ||
+                                  this.gamepad.axes.some(a => Math.abs(a) > this.gamepadAxisDeadZone * 0.5); // More sensitive check for active use
+
+            if (isActiveGamepad) {
+                 this.lastInputType = 'gamepad';
+            }
+            if (this.lastInputType === 'gamepad') return 'gamepad';
+        }
+        return this.lastInputType;
     }
 
     cleanup() {
         if (this.joystick) {
             this.joystick.destroy();
         }
+        // Remove gamepad listeners if any were added directly to window for polling
+        // (In this setup, connection listeners are on window, polling is in getInputState)
+        // No specific interval to clear for gamepad polling as it's integrated.
     }
 }
 

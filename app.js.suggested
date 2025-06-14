@@ -1,0 +1,336 @@
+// Suggested JavaScript logic for app.js
+
+class App {
+    constructor() {
+        this.gameEngine = null;
+        this.storageManager = new StorageManager(); // Assuming StorageManager is available
+        this.settings = this.storageManager.getSettings();
+        this.audioManager = new AudioManager(this.settings.volume); // Assuming AudioManager is available
+
+        // ControlsManager needs gameEngine for some operations (like zoom for targeting)
+        // It's a bit of a circular dependency if GameEngine also needs ControlsManager.
+        // Consider passing specific callbacks or a minimal GameContext to ControlsManager if needed.
+        // For now, assuming GameEngine might be null initially for ControlsManager.
+        this.controlsManager = new ControlsManager(null, this.settings, this.updateControlSchemeVisuals.bind(this));
+
+        this.currentScreen = 'loading-screen';
+        this.cameFromPauseMenu = false; // For settings screen navigation
+
+        this.tutorialSteps = [
+            { title: "Movement", text: "Use the left joystick (or WASD/Arrow keys on keyboard) to move your bot around the arena." },
+            { title: "Aiming", text: "Tap and drag on the right side of the screen (or use the mouse) to aim your bot's weapons." },
+            { title: "Firing", text: "Press the Fire button (Spacebar or Gamepad A) to shoot. Watch your energy!" },
+            { title: "Special Ability", text: "Unleash your bot's Special Ability using the dedicated button (E key or Gamepad B) when the energy bar is full enough." },
+            { title: "Shield", text: "Toggle your Shield (Q key or Gamepad X) for temporary protection. It consumes energy while active." }
+        ];
+        this.currentTutorialStep = 0;
+
+        this.init();
+    }
+
+    async init() {
+        // Show loading screen initially
+        this.showScreen('loading-screen', true); // true for initial, no transition out
+
+        // Simulate loading
+        await this.simulateLoading();
+
+        // Setup core components
+        this.setupSettingsHandlers(); // Load and apply settings first
+
+        // GameEngine might need settings at construction
+        const canvas = document.getElementById('game-canvas');
+        this.gameEngine = new GameEngine(canvas, {
+            quality: this.settings.quality,
+            hapticFeedback: this.settings.hapticFeedback,
+            audioManager: this.audioManager
+            // Pass other necessary options
+        });
+        // Now that gameEngine exists, if ControlsManager needs it:
+        this.controlsManager.gameEngine = this.gameEngine;
+
+
+        this.setupGlobalEventListeners();
+        this.setupMenuButtonHandlers();
+        this.setupTutorialHandlers();
+
+        this.updateControlSchemeVisuals(); // Initial call based on detected input
+
+        // Transition to main menu
+        this.showScreen('main-menu');
+
+        // Start tutorial if not completed
+        if (!this.storageManager.getSetting('tutorialCompleted')) {
+            // Delay tutorial start slightly to ensure main menu is visible
+            setTimeout(() => this.startTutorial(), 500);
+        }
+    }
+
+    async simulateLoading() {
+        const progressBar = document.querySelector('#loading-screen .loading-progress');
+        let progress = 0;
+        while (progress < 100) {
+            await new Promise(resolve => setTimeout(resolve, 30)); // Simulate work
+            progress += 5;
+            if (progressBar) progressBar.style.width = `${progress}%`;
+        }
+        // Ensure it hits 100%
+        if (progressBar) progressBar.style.width = '100%';
+        await new Promise(resolve => setTimeout(resolve, 200)); // Pause at 100%
+    }
+
+    setupGlobalEventListeners() {
+        window.addEventListener('gamepadconnected', (e) => {
+            console.log("Gamepad connected in App:", e.gamepad);
+            this.controlsManager.gamepad = navigator.getGamepads()[e.gamepad.index]; // Ensure ControlsManager gets the object
+            this.controlsManager.setActiveInputType('gamepad');
+        });
+        window.addEventListener('gamepaddisconnected', (e) => {
+            console.log("Gamepad disconnected in App:", e.gamepad);
+            if (this.controlsManager.gamepad && this.controlsManager.gamepad.index === e.gamepad.index) {
+                this.controlsManager.gamepad = null;
+            }
+            // Determine fallback type after disconnect
+            const fallbackType = (typeof window !== 'undefined' && 'ontouchstart' in window) ? 'touch' : 'keyboard';
+            this.controlsManager.setActiveInputType(fallbackType);
+        });
+
+        // Listen for custom event from ControlsManager if it were to dispatch one
+        // document.addEventListener('inputTypeChanged', (event) => {
+        //    this.updateControlSchemeVisuals();
+        // });
+    }
+
+    updateControlSchemeVisuals() {
+        if (!this.controlsManager) return;
+        const activeType = this.controlsManager.getActiveInputType();
+
+        document.body.classList.remove('touch-controls-active', 'keyboard-controls-active', 'gamepad-controls-active');
+
+        const instructionsDiv = document.getElementById('kb-gp-instructions');
+        // Touch controls are visible by default CSS, hidden by other classes.
+        // So, we add classes for keyboard/gamepad to hide touch and show specific instructions.
+
+        if (activeType === 'touch') {
+            document.body.classList.add('touch-controls-active');
+            if (instructionsDiv) instructionsDiv.style.display = 'none';
+        } else if (activeType === 'keyboard') {
+            document.body.classList.add('keyboard-controls-active');
+            if (instructionsDiv) {
+                instructionsDiv.innerHTML = "Move: <strong>WASD/Arrows</strong> | Fire: <strong>Space</strong> | Special: <strong>E</strong> | Shield: <strong>Q</strong>";
+                instructionsDiv.className = 'control-instructions keyboard';
+                instructionsDiv.style.display = 'block';
+            }
+        } else if (activeType === 'gamepad') {
+            document.body.classList.add('gamepad-controls-active');
+            if (instructionsDiv) {
+                instructionsDiv.innerHTML = "Gamepad Connected: <strong>Left Stick</strong> to Move | <strong>A/X</strong> to Fire"; // Example
+                instructionsDiv.className = 'control-instructions gamepad';
+                instructionsDiv.style.display = 'block';
+            }
+        }
+         console.log("App: Updated control scheme visuals for:", activeType);
+    }
+
+    showScreen(screenId, isInitial = false) {
+        const newScreen = document.getElementById(screenId);
+        let oldScreenElement = null;
+
+        if (this.currentScreen && this.currentScreen !== screenId) {
+            oldScreenElement = document.getElementById(this.currentScreen);
+        }
+
+        if (oldScreenElement) {
+            oldScreenElement.classList.add('fade-out-active');
+            oldScreenElement.classList.remove('active'); // Start fade out
+
+            oldScreenElement.addEventListener('transitionend', function handler() {
+                oldScreenElement.classList.remove('fade-out-active');
+                // oldScreenElement.style.display = 'none'; // Or just rely on .active not being present
+                this.removeEventListener('transitionend', handler);
+            });
+        }
+
+        if (newScreen) {
+            // newScreen.style.display = (screenId === 'game-arena' || screenId === 'loading-screen' || newScreen.classList.contains('overlay')) ? 'flex' : 'block'; // Default display
+            newScreen.style.display = newScreen.classList.contains('overlay') || screenId === 'game-arena' || screenId === 'loading-screen' ? 'flex' : 'block';
+
+            newScreen.classList.remove('fade-out-active'); // Remove if it was fading out
+
+            // Force reflow to ensure transition plays
+            void newScreen.offsetHeight;
+
+            newScreen.classList.add('active');
+            newScreen.classList.add('fade-in-active'); // Trigger fade in
+
+            // Remove fade-in class after transition so it doesn't interfere with future transitions
+            newScreen.addEventListener('transitionend', function handler() {
+                newScreen.classList.remove('fade-in-active');
+                this.removeEventListener('transitionend', handler);
+            });
+
+        } else {
+            console.error("Screen not found:", screenId);
+        }
+        this.currentScreen = screenId;
+    }
+
+    setupMenuButtonHandlers() {
+        document.body.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-action]');
+            if (!button) return;
+
+            const action = button.dataset.action;
+
+            // Haptic feedback for menu buttons
+            if (this.settings.hapticFeedback && navigator.vibrate) {
+                 navigator.vibrate(5);
+            }
+            this.handleMenuAction(action, button);
+        });
+    }
+
+    handleMenuAction(action, element) {
+        switch (action) {
+            case 'quick-battle':
+                this.cameFromPauseMenu = false; // Reset flag
+                this.showScreen('game-arena');
+                // Ensure GameEngine is re-initialized if it was destroyed
+                if (!this.gameEngine || this.gameEngine.isDestroyed) { // Assuming an isDestroyed flag or similar check
+                    const canvas = document.getElementById('game-canvas');
+                    this.gameEngine = new GameEngine(canvas, { /* options */ });
+                    this.controlsManager.gameEngine = this.gameEngine; // Re-link if necessary
+                }
+                this.gameEngine.start();
+                break;
+            case 'resume-game':
+                if (this.gameEngine) this.gameEngine.resume();
+                break;
+            case 'quit-to-main-menu':
+                if (this.gameEngine) {
+                    this.gameEngine.destroy(); // Cleanup game resources
+                    this.gameEngine = null; // Allow re-creation
+                }
+                const pauseMenu = document.getElementById('pause-menu');
+                if (pauseMenu) pauseMenu.classList.remove('active'); // Ensure pause menu is hidden
+                this.showScreen('main-menu');
+                this.cameFromPauseMenu = false;
+                break;
+            case 'settings':
+                // this.cameFromPauseMenu is set if game is active and paused
+                if (this.gameEngine && this.gameEngine.isPaused) {
+                    this.cameFromPauseMenu = true;
+                } else {
+                    this.cameFromPauseMenu = false;
+                }
+                this.showScreen('settings');
+                break;
+            case 'back':
+                if (this.currentScreen === 'settings' && this.cameFromPauseMenu) {
+                    this.showScreen('pause-menu'); // Assumes pause menu was active
+                } else {
+                    this.showScreen('main-menu');
+                }
+                this.cameFromPauseMenu = false;
+                break;
+            // ... other cases like 'bot-builder', 'play-again'
+        }
+    }
+
+    startTutorial() {
+        if (this.storageManager.getSetting('tutorialCompleted') && !this.replayTutorial) {
+            console.log("Tutorial already completed.");
+            return;
+        }
+        this.currentTutorialStep = 0;
+        const tutorialOverlay = document.getElementById('tutorial-overlay');
+        // tutorialOverlay.style.display = 'flex'; // Use class for consistency
+        tutorialOverlay.classList.add('active');
+        this.displayTutorialStep(this.currentTutorialStep);
+    }
+
+    displayTutorialStep(stepIndex) {
+        if (stepIndex >= this.tutorialSteps.length) {
+            this.endTutorial();
+            return;
+        }
+        const step = this.tutorialSteps[stepIndex];
+        document.getElementById('tutorial-title').textContent = step.title;
+        document.getElementById('tutorial-text').textContent = step.text;
+    }
+
+    setupTutorialHandlers() {
+        document.getElementById('tutorial-next-btn').addEventListener('click', () => {
+            this.currentTutorialStep++;
+            this.displayTutorialStep(this.currentTutorialStep);
+        });
+        document.getElementById('tutorial-skip-btn').addEventListener('click', () => {
+            this.endTutorial();
+        });
+    }
+
+    endTutorial() {
+        document.getElementById('tutorial-overlay').classList.remove('active');
+        this.storageManager.saveSetting('tutorialCompleted', true);
+        this.replayTutorial = false; // Reset replay flag if used
+        console.log("Tutorial ended.");
+    }
+
+    setupSettingsHandlers() {
+        const qualitySetting = document.getElementById('quality-setting');
+        const framerateSetting = document.getElementById('framerate-setting');
+        const hapticSetting = document.getElementById('haptic-setting');
+        const sensitivitySetting = document.getElementById('sensitivity-setting');
+        const volumeSetting = document.getElementById('volume-setting');
+
+        // Load settings
+        qualitySetting.value = this.settings.quality;
+        framerateSetting.value = this.settings.framerate;
+        hapticSetting.checked = this.settings.hapticFeedback;
+        sensitivitySetting.value = this.settings.sensitivity;
+        volumeSetting.value = this.settings.volume;
+
+        // Apply initial settings
+        this.audioManager.setVolume(this.settings.volume);
+        // GameEngine quality/framerate would be read at its instantiation or via a method.
+
+        // Event listeners
+        qualitySetting.addEventListener('change', (e) => {
+            this.settings.quality = e.target.value;
+            this.storageManager.saveSettings(this.settings);
+            // Game might need re-init or specific systems notified for some quality changes
+        });
+        framerateSetting.addEventListener('change', (e) => {
+            this.settings.framerate = parseInt(e.target.value, 10);
+            this.storageManager.saveSettings(this.settings);
+            // Game loop timing might need adjustment if not using requestAnimationFrame fully dynamically
+        });
+        hapticSetting.addEventListener('change', (e) => {
+            this.settings.hapticFeedback = e.target.checked;
+            this.storageManager.saveSettings(this.settings);
+        });
+        sensitivitySetting.addEventListener('input', (e) => { // Use 'input' for live updates on range sliders
+            this.settings.sensitivity = parseFloat(e.target.value);
+            this.controlsManager.settings.sensitivity = this.settings.sensitivity; // Update ControlsManager directly
+            // No need to call saveSettings here if we save on 'change' or when leaving settings screen
+        });
+        sensitivitySetting.addEventListener('change', () => { // Save on final change
+            this.storageManager.saveSettings(this.settings);
+        });
+        volumeSetting.addEventListener('input', (e) => {
+            this.settings.volume = parseFloat(e.target.value);
+            this.audioManager.setVolume(this.settings.volume);
+        });
+         volumeSetting.addEventListener('change', () => {
+            this.storageManager.saveSettings(this.settings);
+        });
+    }
+}
+
+// Example of how it might be initialized globally if app.js is the main script.
+// const app = new App();
+// window.app = app; // For easy access from console or other scripts if needed during dev
+
+// Note: AudioManager and StorageManager classes are assumed to be defined elsewhere and imported.
+// GameEngine is also imported.
+// ControlsManager is imported.

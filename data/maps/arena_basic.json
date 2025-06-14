@@ -1,0 +1,109 @@
+{
+    "mapId": "arena_basic_v1",
+    "name": "Basic Training Arena",
+    "description": "A simple, open arena for combat training and testing.",
+    "dimensions": { "width": 2000, "height": 1500 },
+    "background": {
+        "type": "grid",
+        "color": "rgba(0, 128, 128, 0.15)",
+        "gridSize": 50,
+        "layers": [
+            {
+                "imagePath": "sprites/bg/space_nebula_far.png",
+                "scrollFactorX": 0.1,
+                "scrollFactorY": 0.1,
+                "zIndex": -10
+            },
+            {
+                "imagePath": "sprites/bg/space_dust_near.png",
+                "scrollFactorX": 0.3,
+                "scrollFactorY": 0.3,
+                "zIndex": -5
+            }
+        ]
+    },
+    "playerStartPositions": [
+        { "id": "player1_start", "x": -700, "y": 0 },
+        { "id": "player2_start", "x": 700, "y": 0 }
+    ],
+    "obstacles": [
+        {
+            "id": "center_block_large",
+            "type": "static_box",
+            "x": 0, "y": 0, "z": 25,
+            "width": 200, "height": 200, "depth": 50,
+            "rotation": 0.0,
+            "render": {
+                "shape": "rectangle",
+                "color": "#333840",
+                "sprite": "sprites/obstacles/metal_crate_large.png"
+            },
+            "physics": { "isStatic": true, "friction": 0.4, "restitution": 0.1, "shape": "box" }
+        },
+        {
+            "id": "top_barrier",
+            "type": "static_wall",
+            "x": 0, "y": 400, "z": 20,
+            "width": 300, "height": 40, "depth": 40,
+            "render": { "shape": "rectangle", "color": "#404850" },
+            "physics": { "isStatic": true, "shape": "box" }
+        },
+        {
+            "id": "bottom_barrier",
+            "type": "static_wall",
+            "x": 0, "y": -400, "z": 20,
+            "width": 300, "height": 40, "depth": 40,
+            "render": { "shape": "rectangle", "color": "#404850" },
+            "physics": { "isStatic": true, "shape": "box" }
+        },
+        {
+            "id": "dynamic_barrel_1",
+            "type": "dynamic_cylinder",
+            "x": -300, "y": -200, "z": 15,
+            "radius": 30, "height": 60,
+            "render": {
+                "shape": "cylinder", "color": "#803030",
+                "sprite": "sprites/obstacles/explosive_barrel.png"
+            },
+            "physics": { "isStatic": false, "mass": 50, "friction": 0.5, "restitution": 0.4, "shape": "cylinder" },
+            "health": 20,
+            "explodesOnDestroy": true
+        },
+        {
+            "id": "dynamic_barrel_2",
+            "type": "dynamic_cylinder",
+            "x": 300, "y": 200, "z": 15,
+            "radius": 30, "height": 60,
+            "render": {
+                "shape": "cylinder", "color": "#803030",
+                "sprite": "sprites/obstacles/explosive_barrel.png"
+            },
+            "physics": { "isStatic": false, "mass": 50, "friction": 0.5, "restitution": 0.4, "shape": "cylinder" },
+            "health": 20,
+            "explodesOnDestroy": true
+        }
+    ],
+    "powerUps": [
+        {
+            "type": "health_pack_small",
+            "x": 0, "y": 250,
+            "respawnTime": 30,
+            "sprite": "sprites/powerups/health_pack.png",
+            "render": {"shape": "circle", "size": 20, "color": "rgba(0,255,0,0.5)"}
+        },
+        {
+            "type": "energy_cell_small",
+            "x": 0, "y": -250,
+            "respawnTime": 25,
+            "sprite": "sprites/powerups/energy_cell.png",
+            "render": {"shape": "circle", "size": 20, "color": "rgba(0,0,255,0.5)"}
+        }
+    ],
+    "audio": {
+        "backgroundMusic": "music_arena_theme_01",
+        "ambientSounds": ["sound_arena_ambience_loop"]
+    },
+    "lighting": {
+        "globalIllumination": "rgba(200,200,255,0.1)"
+    }
+}

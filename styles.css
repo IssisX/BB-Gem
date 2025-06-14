@@ -76,6 +76,107 @@ html, body {
     z-index: 1000;
 }
 
+/* Screen Transitions (Basic - app.js would toggle 'active' and these classes) */
+/* Base screen styles are already set up for transitions if opacity/transform is changed */
+/* These classes are for explicit fade-in/out if needed by app.js showScreen logic */
+.screen.fade-out-active {
+    opacity: 0 !important;
+    transform: scale(0.95) translateX(0) !important; /* Example: shrink and fade, ensure translateX(0) if it was previously active */
+    transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+    pointer-events: none;
+}
+.screen.fade-in-active {
+    opacity: 1 !important;
+    transform: scale(1) translateX(0) !important;
+    transition: opacity 0.3s ease-in, transform 0.3s ease-in;
+    visibility: visible !important;
+}
+
+
+/* Game Message Styling (Countdown, Post-Game) */
+.game-message.overlay-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Orbitron', 'Michroma', sans-serif; /* Tech font */
+    font-size: clamp(3rem, 10vw, 5rem); /* Responsive font size */
+    font-weight: bold;
+    color: #fff;
+    text-align: center;
+    text-shadow: 0 0 10px var(--primary-cyan, #00ffff),
+                 0 0 20px var(--primary-cyan, #00ffff),
+                 0 0 30px var(--primary-magenta, #ff00ff); /* More intense shadow */
+    z-index: 2000; /* Very high to be on top of everything except maybe modals */
+    display: none; /* Hidden by default */
+    pointer-events: none; /* Don't intercept clicks */
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+    padding: 1rem;
+    border-radius: 10px;
+    background: rgba(26, 26, 46, 0.5); /* Slight background for readability */
+    backdrop-filter: blur(3px);
+}
+.game-message.overlay-message.visible {
+    display: block; /* Or flex if content needs centering */
+    opacity: 1;
+}
+.game-message.overlay-message.victory {
+    color: var(--success-green);
+    text-shadow: 0 0 10px var(--success-green), 0 0 20px var(--success-green);
+}
+.game-message.overlay-message.defeat {
+    color: var(--danger-red);
+    text-shadow: 0 0 10px var(--danger-red), 0 0 20px var(--danger-red);
+}
+
+
+/* Pause Menu & Tutorial Overlay Common Styling */
+.menu-box {
+    background: var(--bg-panel, #1a1a2e);
+    border: 2px solid var(--primary-cyan, #00ffff);
+    border-radius: 12px;
+    padding: 2rem;
+    margin: 1rem;
+    text-align: center;
+    max-width: 450px;
+    width: 90%;
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.3), 0 0 30px rgba(0,0,0,0.5);
+    color: var(--text-light, #E0E0E0);
+}
+.menu-box h2, .menu-box h3 {
+    color: var(--primary-cyan, #00ffff);
+    margin-bottom: 1.5rem;
+    text-shadow: 0 0 8px var(--primary-cyan);
+    font-family: 'Orbitron', 'Michroma', sans-serif;
+}
+.menu-box .menu-btn {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+    width: 100%;
+}
+
+#pause-menu .pause-content h2 {
+    font-size: 2rem;
+}
+
+#tutorial-overlay .tutorial-content p {
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+    color: var(--text-secondary, #aaa);
+    text-align: left;
+    font-family: 'Roboto', 'Segoe UI', sans-serif; /* More readable font for paragraph */
+}
+#tutorial-overlay .tutorial-content .menu-btn-group {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+}
+#tutorial-overlay .tutorial-content .menu-btn-group .menu-btn {
+    flex-basis: 48%;
+}
+
+
 /* Loading Screen */
 #loading-screen {
     justify-content: center;
@@ -88,48 +189,71 @@ html, body {
     padding: 2rem;
 }
 
-.cyber-logo {
-    margin-bottom: 3rem;
+/* Loading Screen Styling */
+#loading-screen .loading-content { /* Already flex, just ensuring alignment */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 
-.logo-text {
-    font-size: clamp(2rem, 8vw, 4rem);
+#loading-screen .cyber-logo {
+    margin-bottom: 40px; /* Increased spacing */
+}
+
+#loading-screen .logo-text {
+    font-family: 'Orbitron', 'Michroma', 'Electrolize', sans-serif; /* Tech font */
+    font-size: clamp(2.5rem, 9vw, 4.5rem); /* Slightly larger & more responsive */
     font-weight: bold;
-    color: var(--primary-cyan);
-    text-shadow: 0 0 20px var(--primary-cyan);
-    animation: pulse-glow 2s ease-in-out infinite alternate;
+    color: var(--primary-cyan, #00ffff);
+    letter-spacing: 3px; /* Increased letter spacing */
+    text-shadow: 0 0 8px color-mix(in srgb, var(--primary-cyan) 50%, transparent),
+                 0 0 15px color-mix(in srgb, var(--primary-cyan) 30%, transparent),
+                 0 0 25px color-mix(in srgb, var(--primary-cyan) 20%, transparent);
+    /* animation: pulse-glow 2s infinite alternate; // Kept existing animation */
 }
 
-.logo-subtitle {
-    font-size: clamp(1rem, 4vw, 1.5rem);
-    color: var(--primary-magenta);
-    text-shadow: 0 0 10px var(--primary-magenta);
-    margin-top: 0.5rem;
+
+#loading-screen .logo-subtitle {
+    font-family: 'Orbitron', 'Michroma', 'Electrolize', sans-serif; /* Tech font */
+    font-size: clamp(1.1rem, 4.5vw, 1.6rem); /* Adjusted */
+    color: var(--primary-magenta, #ff00ff);
+    text-shadow: 0 0 8px color-mix(in srgb, var(--primary-magenta) 50%, transparent),
+                 0 0 15px color-mix(in srgb, var(--primary-magenta) 30%, transparent);
+    letter-spacing: 2px; /* Increased */
+    text-transform: uppercase;
+    margin-top: 8px; /* Adjusted margin */
 }
 
-.loading-bar {
+#loading-screen .loading-bar {
     width: 80%;
-    max-width: 300px;
-    height: 4px;
-    background: rgba(0, 255, 255, 0.2);
-    border-radius: 2px;
-    margin: 2rem auto;
+    max-width: 350px; /* Increased max-width */
+    height: 8px; /* Thicker for modern feel */
+    background-color: rgba(0,0,0,0.3); /* Darker, semi-transparent background for the bar */
+    border-radius: 4px; /* Adjusted for new height */
+    margin: 30px auto; /* Adjusted margin */
     overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--primary-accent, #00ffff) 50%, #333); /* Themed border */
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.4); /* Inner shadow for depth */
 }
 
-.loading-progress {
+#loading-screen .loading-progress {
+    width: 0%; /* Updated by JS */
     height: 100%;
-    background: linear-gradient(90deg, var(--primary-cyan), var(--primary-magenta));
-    width: 0%;
-    animation: loading-fill 3s ease-in-out infinite;
-    box-shadow: 0 0 10px var(--primary-cyan);
+    background: linear-gradient(to right, var(--primary-accent, #00ffff), color-mix(in srgb, var(--primary-magenta) 90%, var(--primary-accent))); /* Gradient progress */
+    border-radius: 3px; /* Slightly smaller radius than parent for effect */
+    /* animation: loading-fill 3s ease-in-out infinite; // Kept existing animation */
+    box-shadow: 0 0 8px var(--primary-accent, #00ffff), 0 0 12px var(--primary-magenta); /* Glow for the progress part */
 }
 
-.loading-text {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    margin-top: 1rem;
+#loading-screen .loading-text {
+    font-family: 'Roboto', 'Segoe UI', sans-serif; /* Cleaner font for status text */
+    font-size: 0.85rem; /* Slightly smaller */
+    color: var(--text-secondary, #aaa);
+    margin-top: 15px; /* Adjusted margin */
+    letter-spacing: 0.5px;
 }
+
 
 /* Main Menu */
 #main-menu {
@@ -167,47 +291,60 @@ html, body {
 }
 
 .menu-btn {
+    background: linear-gradient(to bottom, #3a505a, #2c3e47);
+    border: 1px solid var(--primary-accent, #00ffff);
+    color: var(--text-light, #E0E0E0);
+    padding: 12px 20px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: background 0.3s, box-shadow 0.3s, transform 0.1s ease;
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    min-height: var(--touch-target);
-    padding: 1rem 1.5rem;
-    background: var(--bg-panel);
-    border: 2px solid var(--border-glow);
-    border-radius: 8px;
-    color: var(--text-primary);
-    font-family: inherit;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
+    gap: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    text-transform: uppercase;
+    font-family: 'Orbitron', 'Michroma', 'Electrolize', sans-serif;
+    clip-path: polygon(5% 0%, 100% 0%, 95% 100%, 0% 100%);
     position: relative;
-    overflow: hidden;
+    min-height: var(--touch-target);
 }
-
 .menu-btn:before {
     content: '';
     position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.2), transparent);
-    transition: left 0.5s ease;
+    top: 0; left: 5%; right: 5%;
+    height: 1px;
+    background: rgba(255,255,255,0.1);
 }
 
-.menu-btn:active:before {
-    left: 100%;
-}
 
 .menu-btn.primary {
-    background: linear-gradient(135deg, var(--bg-panel), var(--bg-card));
-    border-color: var(--primary-cyan);
-    box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+    background: linear-gradient(to bottom, var(--primary-accent), color-mix(in srgb, var(--primary-accent) 80%, black));
+    color: var(--background-dark, #121212);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--primary-accent) 70%, transparent),
+                0 0 20px color-mix(in srgb, var(--primary-accent) 40%, transparent);
+    border-color: color-mix(in srgb, var(--primary-accent) 60%, white);
+}
+.menu-btn.primary .btn-icon {
+    filter: none;
+}
+
+
+.menu-btn:hover, .menu-btn:focus {
+    background: linear-gradient(to bottom, #4F6D7A, #3A505A);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--primary-accent) 80%, transparent);
+    outline: none;
+}
+
+.menu-btn.primary:hover, .menu-btn.primary:focus {
+    background: linear-gradient(to bottom, color-mix(in srgb, var(--primary-accent) 110%, white), var(--primary-accent));
+    box-shadow: 0 0 15px color-mix(in srgb, var(--primary-accent) 90%, transparent),
+                0 0 30px color-mix(in srgb, var(--primary-accent) 60%, transparent);
 }
 
 .menu-btn:active {
-    transform: scale(0.95);
-    box-shadow: 0 0 30px var(--border-glow);
+    transform: translateY(1px) scale(0.98);
+    box-shadow: 0 0 5px color-mix(in srgb, var(--primary-accent) 50%, transparent);
 }
 
 .btn-icon {
@@ -367,6 +504,173 @@ html, body {
     border-radius: 4px;
     font-size: 0.8rem;
     color: var(--text-primary);
+}
+
+/* Adaptive Control UI Styles */
+.controls-hidden {
+    display: none !important; /* Force hide for elements like joystick/buttons */
+}
+
+#kb-gp-instructions {
+    position: absolute;
+    bottom: 20px; /* Adjust as needed */
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.7);
+    color: var(--text-light);
+    padding: 8px 15px;
+    border-radius: 5px;
+    font-size: 0.9rem;
+    text-align: center;
+    z-index: 10;
+    display: none;
+}
+
+/* Screen Transitions (Basic - app.js would toggle 'active' and these classes) */
+.screen.fade-out-active {
+    opacity: 0 !important; /* Force opacity for transition */
+    transform: scale(0.95) !important; /* Example exit animation */
+    transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+.screen.fade-in-active {
+    opacity: 1 !important; /* Force opacity */
+    transform: scale(1) !important; /* Example enter animation */
+    transition: opacity 0.3s ease-in, transform 0.3s ease-in;
+    visibility: visible !important; /* Ensure it's visible */
+}
+
+
+.game-message.overlay-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 4rem;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 0 0 10px var(--primary-accent, #00ffff), 0 0 20px var(--primary-accent, #00ffff);
+    z-index: 1001; /* Above game HUD, below modals like pause */
+    display: none; /* Hidden by default */
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+.game-message.overlay-message.visible {
+    display: block;
+    opacity: 1;
+}
+.game-message.overlay-message.victory { color: var(--success-green); text-shadow: 0 0 10px var(--success-green), 0 0 20px var(--success-green); }
+.game-message.overlay-message.defeat { color: var(--danger-red); text-shadow: 0 0 10px var(--danger-red), 0 0 20px var(--danger-red); }
+
+
+/* Pause Menu & Tutorial Overlay Styling */
+.menu-box { /* Common styling for content boxes in overlays */
+    background: var(--bg-panel, #1a1a2e);
+    border: 2px solid var(--primary-cyan, #00ffff);
+    border-radius: 12px;
+    padding: 2rem;
+    margin: 1rem;
+    text-align: center;
+    max-width: 450px;
+    width: 90%;
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.3), 0 0 30px rgba(0,0,0,0.5);
+    color: var(--text-light, #E0E0E0);
+}
+.menu-box h2, .menu-box h3 {
+    color: var(--primary-cyan, #00ffff);
+    margin-bottom: 1.5rem;
+    text-shadow: 0 0 8px var(--primary-cyan);
+}
+.menu-box .menu-btn {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+    width: 100%;
+}
+
+#pause-menu .pause-content h2 { /* Specific styling if needed */
+    font-size: 2rem;
+}
+
+#tutorial-overlay .tutorial-content p {
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+    color: var(--text-secondary, #aaa);
+    text-align: left;
+}
+#tutorial-overlay .tutorial-content .menu-btn-group {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+}
+#tutorial-overlay .tutorial-content .menu-btn-group .menu-btn {
+    flex-basis: 48%;
+}
+
+/* Settings Screen Form Elements Styling */
+.settings-section {
+    margin-bottom: 1.5rem; /* Consistent spacing */
+}
+.settings-section h3 {
+    color: var(--primary-magenta, #ff00ff); /* Use accent color for section titles */
+    border-bottom: 1px solid var(--primary-accent, #00ffff);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+.setting-item {
+    background: rgba(0,0,0,0.2); /* Subtle background for each item */
+    border: 1px solid color-mix(in srgb, var(--primary-accent) 30%, transparent);
+    /* padding: 0.8rem 1rem; /* Adjusted padding */
+    /* margin-bottom: 0.8rem; /* Adjusted margin */
+}
+.setting-item label {
+    flex-basis: 50%; /* Give label more space */
+    font-weight: normal; /* Less emphasis than button text */
+    color: var(--text-light);
+}
+.setting-item select,
+.setting-item input[type="range"],
+.setting-item input[type="checkbox"] {
+    flex-basis: 45%; /* Allow input to take up space */
+    background: var(--bg-card);
+    border: 1px solid var(--primary-accent);
+    color: var(--text-primary);
+    border-radius: 4px;
+    padding: 0.4rem;
+    font-family: 'Roboto', sans-serif; /* More standard font for form elements */
+}
+.setting-item input[type="range"] {
+    padding: 0; /* Range inputs often need specific styling */
+    /* Basic track/thumb styling would go here if desired, but it's complex */
+}
+.setting-item input[type="checkbox"] {
+    width: 22px; /* Slightly larger checkbox */
+    height: 22px;
+    accent-color: var(--primary-magenta); /* Themed check color */
+}
+.setting-item select {
+    appearance: none; /* Basic reset for custom select arrow */
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300ffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    background-size: 1em;
+    padding-right: 2rem; /* Space for arrow */
+}
+
+
+/* Show instructions only when specific body class is present */
+body.keyboard-controls-active #kb-gp-instructions.keyboard,
+body.gamepad-controls-active #kb-gp-instructions.gamepad {
+    display: block;
+}
+
+/* Hide touch controls when keyboard/gamepad is active */
+body.keyboard-controls-active .virtual-joystick,
+body.keyboard-controls-active .action-buttons,
+body.keyboard-controls-active .targeting-area,
+body.gamepad-controls-active .virtual-joystick,
+body.gamepad-controls-active .action-buttons,
+body.gamepad-controls-active .targeting-area {
+    display: none;
 }
 
 .game-controls {

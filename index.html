@@ -107,6 +107,22 @@
                     </div>
                 </div>
                 <button class="pause-btn" id="pause-btn">⏸️</button>
+            <!-- Placeholder for Keyboard/Gamepad instructions -->
+            <div id="kb-gp-instructions" class="control-instructions"></div>
+            <!-- Countdown Message -->
+            <div id="countdown-message" class="game-message overlay-message"></div>
+            <!-- Post-Game Message (KO, Victory, Defeat before transitioning to game-over screen) -->
+            <div id="post-game-message" class="game-message overlay-message"></div>
+
+            <!-- Pause Menu -->
+            <div id="pause-menu" class="screen overlay" style="display: none; opacity: 0; transform: none; justify-content: center; align-items: center;">
+                <div class="pause-content menu-box"> <!-- Re-use menu-box styling or create specific -->
+                    <h2>Paused</h2>
+                    <button class="menu-btn" data-action="resume-game">Resume</button>
+                    <button class="menu-btn" data-action="settings">Settings</button>
+                    <button class="menu-btn secondary" data-action="quit-to-main-menu">Main Menu</button>
+                </div>
+            </div>
             </div>
             
             <div class="game-canvas-container">
@@ -192,8 +208,8 @@
         </div>
 
         <!-- Game Over -->
-        <div id="game-over" class="screen overlay">
-            <div class="game-over-content">
+        <div id="game-over" class="screen overlay"> <!-- Game Over screen itself is an overlay -->
+            <div class="game-over-content"> <!-- Ensure this has menu-box or similar styling for consistency -->
                 <div class="result-text" id="result-text">VICTORY!</div>
                 <div class="stats">
                     <div class="stat-item">
@@ -212,6 +228,18 @@
                 <div class="game-over-buttons">
                     <button class="menu-btn" data-action="play-again">Play Again</button>
                     <button class="menu-btn secondary" data-action="main-menu">Main Menu</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tutorial Overlay -->
+        <div id="tutorial-overlay" class="screen overlay" style="display: none; opacity: 0; transform: none; justify-content: center; align-items: center;">
+            <div class="tutorial-content menu-box">
+                <h3 id="tutorial-title" style="margin-bottom: 1rem; color: var(--primary-cyan);">Tutorial</h3>
+                <p id="tutorial-text" style="margin-bottom: 1.5rem; line-height: 1.6;"></p>
+                <div style="display: flex; justify-content: space-between; width:100%;">
+                    <button id="tutorial-skip-btn" class="menu-btn secondary" style="flex-basis: 48%;">Skip</button>
+                    <button id="tutorial-next-btn" class="menu-btn primary" style="flex-basis: 48%;">Next</button>
                 </div>
             </div>
         </div>

@@ -1,0 +1,44 @@
+[
+    {
+        "id": "armor_plating_light",
+        "name": "Light Plating",
+        "category": "armor",
+        "type": "plating",
+        "sprite": "sprites/armor_plating_light.png",
+        "description": "Basic protection, adds minimal mass.",
+        "stats": {
+            "addedHealth": 20,
+            "addedMass": 5,
+            "damageReduction": 0.05
+        }
+    },
+    {
+        "id": "armor_plating_medium",
+        "name": "Medium Plating",
+        "category": "armor",
+        "type": "plating",
+        "sprite": "sprites/armor_plating_medium.png",
+        "description": "Standard armor offering a good balance of protection and weight.",
+        "stats": {
+            "addedHealth": 40,
+            "addedMass": 15,
+            "damageReduction": 0.10
+        }
+    },
+    {
+        "id": "armor_energy_shield_emitter",
+        "name": "Energy Shield Emitter",
+        "category": "armor",
+        "type": "shield_emitter",
+        "sprite": "sprites/shield_emitter_module.png",
+        "description": "Generates a regenerating energy shield, but adds significant mass and consumes some base energy.",
+        "stats": {
+            "addedHealth": 5, // Small physical health bonus
+            "shieldCapacity": 50, // Max shield points
+            "shieldRegenRate": 5, // Points per second
+            "shieldRechargeDelay": 3, // Seconds after last hit before regen starts
+            "addedMass": 10,
+            "energyConsumptionModifier": 1.1 // Increases energy costs by 10%
+        }
+    }
+]
