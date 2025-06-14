@@ -2,34 +2,35 @@ import { PhysicsEngine } from './physics.js';
 import { ControlsManager } from './controls.js';
 
 // ECS Core
-const Entity = require('./src/Entity');
-const EntityManager = require('./src/EntityManager');
+import Entity from './src/Entity.js';
+import EntityManager from './src/EntityManager.js';
 
 // Components
-const PositionComponent = require('./src/components/PositionComponent');
-const VelocityComponent = require('./src/components/VelocityComponent');
-const RenderComponent = require('./src/components/RenderComponent');
-const PhysicsComponent = require('./src/components/PhysicsComponent');
-const PlayerControlledComponent = require('./src/components/PlayerControlledComponent');
-const AIControlledComponent = require('./src/components/AIControlledComponent');
-const HealthComponent = require('./src/components/HealthComponent');
-const EnergyComponent = require('./src/components/EnergyComponent');
-const WeaponComponent = require('./src/components/WeaponComponent');
-const AnimationComponent = require('./src/components/AnimationComponent');
+import PositionComponent from './src/components/PositionComponent.js';
+import VelocityComponent from './src/components/VelocityComponent.js';
+import RenderComponent from './src/components/RenderComponent.js';
+import PhysicsComponent from './src/components/PhysicsComponent.js';
+import PlayerControlledComponent from './src/components/PlayerControlledComponent.js';
+import AIControlledComponent from './src/components/AIControlledComponent.js';
+import HealthComponent from './src/components/HealthComponent.js';
+import EnergyComponent from './src/components/EnergyComponent.js';
+import WeaponComponent from './src/components/WeaponComponent.js';
+import AnimationComponent from './src/components/AnimationComponent.js';
+// ProjectileComponent and EffectComponent are used by systems, not directly by GameEngine usually.
+// If GameEngine needed them, they would be imported here.
 
 // Systems
-const PhysicsSystem = require('./src/systems/PhysicsSystem');
-const RenderSystem = require('./src/systems/RenderSystem');
-const PlayerInputSystem = require('./src/systems/PlayerInputSystem');
-const AISystem = require('./src/systems/AISystem');
-const CollisionSystem = require('./src/systems/CollisionSystem');
-const EnergySystem = require('./src/systems/EnergySystem');
-const HealthSystem = require('./src/systems/HealthSystem');
-const ParticleSystem = require('./src/systems/ParticleSystem');
-const EffectSystem = require('./src/systems/EffectSystem');
-const AnimationSystem = require('./src/systems/AnimationSystem');
-const CANNON = require('cannon'); // Assuming cannon is mapped in importmap or accessible
-
+import PhysicsSystem from './src/systems/PhysicsSystem.js';
+import RenderSystem from './src/systems/RenderSystem.js';
+import PlayerInputSystem from './src/systems/PlayerInputSystem.js';
+import AISystem from './src/systems/AISystem.js';
+import CollisionSystem from './src/systems/CollisionSystem.js';
+import EnergySystem from './src/systems/EnergySystem.js';
+import HealthSystem from './src/systems/HealthSystem.js';
+import ParticleSystem from './src/systems/ParticleSystem.js';
+import EffectSystem from './src/systems/EffectSystem.js';
+import AnimationSystem from './src/systems/AnimationSystem.js';
+import * as CANNON from 'cannon'; // Corrected import for Cannon.js
 
 export class GameEngine {
     constructor(canvas, options, dataManager) {

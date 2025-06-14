@@ -3,12 +3,16 @@ import Component from '../Component.js';
 class AIControlledComponent extends Component {
   constructor(initialState = 'idle', target = null) {
     super();
-    this.state = initialState; // e.g., 'idle', 'attacking', 'fleeing'
-    this.target = target; // Reference to a target entity (e.g., the player)
-    this.perceptionRadius = 10; // How far the AI can "see"
-    this.attackRange = 2; // How close the AI needs to be to attack
-    this.lastActionTime = 0; // Timestamp of the last significant action
-    this.actionCooldown = 1000; // Milliseconds AI waits between actions
+    this.state = initialState;
+    this.target = target;
+    this.perceptionRadius = 400; // Increased from 10
+    this.attackRange = 250;    // Increased from 2
+    this.lastActionTime = 0;
+    this.actionCooldown = 1000;
+    // Consider adding other AI tuning parameters here:
+    // this.retreatThreshold = 0.25; // e.g., retreat if health is below 25%
+    // this.preferredEngagementRange = [150, 300]; // Min/max distance AI tries to keep
+    // this.accuracy = 0.75; // For projectile firing, if implementing variable accuracy
   }
 }
 
