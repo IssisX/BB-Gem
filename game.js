@@ -33,11 +33,12 @@ import AnimationSystem from './src/systems/AnimationSystem.js';
 import * as CANNON from 'cannon'; // Corrected import for Cannon.js
 
 export class GameEngine {
-    constructor(canvas, options, dataManager) {
+    constructor(canvas, options, dataManager, audioManager, controlsManager) { // Added audioManager, controlsManager
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.options = options; // Game settings from app.js
         this.dataManager = dataManager; // DataManager instance
+        this.audioManager = audioManager || options.audioManager; // Use passed or from options
         this.isRunning = false;
         this.isPaused = false;
         this.lastTime = 0;
@@ -45,7 +46,8 @@ export class GameEngine {
         this.maxGameTime = 120000;
         
         this.physics = null;
-        this.controls = null;
+        // Use the passed controlsManager or create a new one (app.js should always pass one now)
+        this.controls = controlsManager || new ControlsManager(this, this.options, this.options.onInputTypeChange);
         this.camera = {
             targetX: 0, targetY: 0, currentX: 0, currentY: 0, zoom: 1,
             target: null,
@@ -83,9 +85,9 @@ export class GameEngine {
         
         // Pass necessary options to PhysicsEngine if its constructor uses them
         this.physics = new PhysicsEngine(this.options);
-        // Pass gameEngine instance (this) and options to ControlsManager.
-        // Also pass the callback for adaptive UI.
-        this.controls = new ControlsManager(this, this.options, this.options.onInputTypeChange);
+        // Pass gameEngine instance (this) and options to ControlsManager IF WE CREATE IT HERE.
+        // this.controls = new ControlsManager(this, this.options, this.options.onInputTypeChange);
+        // Now this.controls is already initialized from constructor parameter.
 
         // Initialize Systems
         const effectSystem = new EffectSystem(this.entityManager);
@@ -417,13 +419,15 @@ export class GameEngine {
         const renderSys = this.systems.find(s => s instanceof RenderSystem);
         if(renderSys) renderSys.updateDOMUI(this.entityManager); // Initial display of '3'
 
-        const countdownInterval = setInterval(() => {
+        if (this.countdownIntervalId) clearInterval(this.countdownIntervalId); // Clear previous before setting new
+        this.countdownIntervalId = setInterval(() => {
             currentMessageIndex++;
             if (currentMessageIndex < messages.length) {
                 this.countdownMessage = messages[currentMessageIndex];
                 if(renderSys) renderSys.updateDOMUI(this.entityManager);
             } else {
-                clearInterval(countdownInterval);
+                clearInterval(this.countdownIntervalId);
+                this.countdownIntervalId = null;
                 this.countdownMessage = "";
                 if(renderSys) renderSys.updateDOMUI(this.entityManager);
                 this.playerInputDisabled = false;
@@ -534,7 +538,9 @@ export class GameEngine {
         const seconds = Math.floor((timeLeft % 60000) / 1000);
         const timerElement = document.getElementById('game-timer');
         if (timerElement) timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        setTimeout(() => this.updateGameTimer(), 1000); // Update every second
+
+        if (this.gameTimerTimeoutId) clearTimeout(this.gameTimerTimeoutId); // Clear previous before setting new
+        this.gameTimerTimeoutId = setTimeout(() => this.updateGameTimer(), 1000); // Update every second
     }
 
     render() { /* Effectively empty, RenderSystem handles drawing */ }
@@ -648,18 +654,78 @@ export class GameEngine {
         }
     }
 
+    updateOptions(newOptions) {
+        this.options = { ...this.options, ...newOptions };
+        // Propagate options to relevant systems or managers if needed
+        if (this.controls && typeof this.controls.updateOptions === 'function') {
+            this.controls.updateOptions(this.options);
+        }
+        // Example: RenderSystem might need to know about quality changes
+        const renderSys = this.systems.find(s => s instanceof RenderSystem);
+        if (renderSys && typeof renderSys.updateOptions === 'function') {
+            renderSys.updateOptions(this.options);
+        }
+        // Physics settings might also be updated
+        if (this.physics && typeof this.physics.updateOptions === 'function') {
+            this.physics.updateOptions(this.options);
+        }
+        console.log('GameEngine options updated:', this.options);
+    }
+
+    isDestroyed() {
+        // Helper to check if game engine instance is considered destroyed
+        return !this.isRunning && this.systems.length === 0;
+    }
+
     destroy() {
         this.isRunning = false;
+        this.isPaused = true; // Ensure game logic stops
+
         // Clear any intervals (like countdown)
-        if (this.countdownInterval) clearInterval(this.countdownInterval); // Ensure interval ID is stored
+        // Make sure countdownInterval is actually stored on 'this' if it needs to be cleared here
+        if (this.countdownIntervalId) { // Assuming the ID is stored as this.countdownIntervalId
+             clearInterval(this.countdownIntervalId);
+             this.countdownIntervalId = null;
+        }
+        // Clear game timer timeout
+        if (this.gameTimerTimeoutId) { // Assuming ID is stored
+            clearTimeout(this.gameTimerTimeoutId);
+            this.gameTimerTimeoutId = null;
+        }
+
 
         if (this.physics) this.physics.cleanup();
-        if (this.controls) this.controls.cleanup();
-        this.entityManager.getAllEntities().forEach(entity => this.entityManager.removeEntity(entity.id));
+        // this.controls are managed by app.js now, so app.js should handle its lifecycle if necessary
+        // However, if GameEngine created it, it should clean it up.
+        // For now, assume app.js manages the ControlsManager passed in.
+        // if (this.controls && typeof this.controls.cleanup === 'function' && !this.options.passedControlsManager) {
+        //    this.controls.cleanup();
+        // }
+
+        this.entityManager.getAllEntities().forEach(entity => {
+            const physicsComp = entity.getComponent(PhysicsComponent);
+            if (physicsComp && physicsComp.body) {
+                this.physics.world.removeBody(physicsComp.body);
+            }
+            // No need to call entityManager.removeEntity here if entityManager.clearAllEntities() is called
+        });
+        this.entityManager.clearAllEntities();
+
+
         this.systems.forEach(system => { if (typeof system.destroy === 'function') system.destroy(); });
         this.systems = [];
         this.systemUpdateOrder = [];
         this.eventListeners = {};
+
+        // Remove canvas-specific listeners if GameEngine added them directly
+        // (Currently, event listeners like pause button are handled in setupEventListeners, which is fine)
+
+        this.camera.target = null; // Clear camera target
+
         console.log('GameEngine destroyed and cleaned up.');
     }
 }
+// In startMatchCountdown, store the interval ID:
+// this.countdownIntervalId = setInterval(...);
+// In updateGameTimer, store the timeout ID:
+// this.gameTimerTimeoutId = setTimeout(...);
