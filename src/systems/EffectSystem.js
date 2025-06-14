@@ -1,7 +1,7 @@
-const System = require('../System');
-const EffectComponent = require('../components/EffectComponent');
-const PositionComponent = require('../components/PositionComponent'); // For positional effects
-const RenderComponent = require('../components/RenderComponent');   // To update for rendering
+import System from '../System.js';
+import EffectComponent from '../components/EffectComponent.js';
+import PositionComponent from '../components/PositionComponent.js';
+import RenderComponent from '../components/RenderComponent.js';
 
 class EffectSystem extends System {
   constructor(entityManager) {
@@ -112,4 +112,4 @@ class EffectSystem extends System {
   }
 }
 
-module.exports = EffectSystem;
+export default EffectSystem;

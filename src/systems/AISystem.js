@@ -1,15 +1,15 @@
-const System = require('../System');
-const AIControlledComponent = require('../components/AIControlledComponent');
-const PositionComponent = require('../components/PositionComponent');
-const VelocityComponent = require('../components/VelocityComponent');
-const WeaponComponent = require('../components/WeaponComponent');
-const EnergyComponent = require('../components/EnergyComponent');
-const PlayerControlledComponent = require('../components/PlayerControlledComponent');
-const RenderComponent = require('../components/RenderComponent');
-const PhysicsComponent = require('../components/PhysicsComponent');
-const ProjectileComponent = require('../components/ProjectileComponent');
-const AnimationComponent = require('../components/AnimationComponent'); // Import AnimationComponent
-const CANNON = require('cannon-es');
+import System from '../System.js';
+import AIControlledComponent from '../components/AIControlledComponent.js';
+import PositionComponent from '../components/PositionComponent.js';
+import VelocityComponent from '../components/VelocityComponent.js';
+import WeaponComponent from '../components/WeaponComponent.js';
+import EnergyComponent from '../components/EnergyComponent.js';
+import PlayerControlledComponent from '../components/PlayerControlledComponent.js';
+import RenderComponent from '../components/RenderComponent.js';
+import PhysicsComponent from '../components/PhysicsComponent.js';
+import ProjectileComponent from '../components/ProjectileComponent.js';
+import AnimationComponent from '../components/AnimationComponent.js';
+import CANNON from 'cannon'; // Use import map alias
 
 class AISystem extends System {
   constructor(entityManager) {
@@ -178,4 +178,4 @@ class AISystem extends System {
   }
 }
 
-module.exports = AISystem;
+export default AISystem;

@@ -1,8 +1,8 @@
 class Entity {
-  constructor(id, entityManager) { // Added id and entityManager
-    this.id = id; // ID assigned by EntityManager
-    this.entityManager = entityManager; // Reference to the EntityManager
-    this.components = new Map(); // Store components by their class (constructor)
+  constructor(id, entityManager) {
+    this.id = id;
+    this.entityManager = entityManager;
+    this.components = new Map();
   }
 
   addComponent(component) {
@@ -10,7 +10,7 @@ class Entity {
     if (this.entityManager) {
       this.entityManager._mapEntityComponent(this, component.constructor);
     }
-    return this; // For chaining
+    return this;
   }
 
   getComponent(componentClass) {
@@ -28,17 +28,16 @@ class Entity {
         this.entityManager._unmapEntityComponent(this, componentClass);
       }
     }
-    return this; // For chaining
+    return this;
   }
 
   getAllComponents() {
     return Array.from(this.components.values());
   }
 
-  // Optional: for debugging or specific use cases
   toString() {
     return `Entity(${this.id}, Components: [${Array.from(this.components.keys()).map(c => c.name).join(', ')}])`;
   }
 }
 
-module.exports = Entity;
+export default Entity;

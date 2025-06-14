@@ -1,4 +1,4 @@
-const Component = require('../Component');
+import Component from '../Component.js';
 
 class ProjectileComponent extends Component {
   constructor(damage = 10, ownerEntityId = null, lifetime = 2000) { // lifetime in ms
@@ -23,4 +23,4 @@ class ProjectileComponent extends Component {
   }
 }
 
-module.exports = ProjectileComponent;
+export default ProjectileComponent;

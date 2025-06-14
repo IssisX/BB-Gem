@@ -1,4 +1,4 @@
-const Component = require('../Component');
+import Component from '../Component.js';
 
 class PhysicsComponent extends Component {
   constructor(body = null, options = {}) {
@@ -43,4 +43,4 @@ class PhysicsComponent extends Component {
   }
 }
 
-module.exports = PhysicsComponent;
+export default PhysicsComponent;

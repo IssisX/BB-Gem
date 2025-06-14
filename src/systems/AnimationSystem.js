@@ -1,7 +1,7 @@
-const System = require('../System');
-const AnimationComponent = require('../components/AnimationComponent');
-const RenderComponent = require('../components/RenderComponent');
-const PositionComponent = require('../components/PositionComponent');
+import System from '../System.js';
+import AnimationComponent from '../components/AnimationComponent.js';
+import RenderComponent from '../components/RenderComponent.js';
+import PositionComponent from '../components/PositionComponent.js';
 
 // Simple Easing Functions (can be expanded or moved to a utility file)
 const EasingFunctions = {
@@ -106,4 +106,4 @@ class AnimationSystem extends System {
   }
 }
 
-module.exports = AnimationSystem;
+export default AnimationSystem;

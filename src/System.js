@@ -11,4 +11,4 @@ class System {
   }
 }
 
-module.exports = System;
+export default System;

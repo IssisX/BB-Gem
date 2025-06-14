@@ -1,4 +1,4 @@
-const Component = require('../Component');
+import Component from '../Component.js';
 
 class ParticleComponent extends Component {
   constructor(options = {}) {
@@ -66,4 +66,4 @@ class ParticleComponent extends Component {
   }
 }
 
-module.exports = ParticleComponent;
+export default ParticleComponent;

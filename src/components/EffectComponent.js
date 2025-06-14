@@ -1,4 +1,4 @@
-const Component = require('../Component');
+import Component from '../Component.js';
 
 class EffectComponent extends Component {
   constructor(options = {}) {
@@ -59,4 +59,4 @@ class EffectComponent extends Component {
   }
 }
 
-module.exports = EffectComponent;
+export default EffectComponent;

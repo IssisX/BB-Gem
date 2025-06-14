@@ -1,13 +1,13 @@
-const System = require('../System');
-const ParticleComponent = require('../components/ParticleComponent');
-const PositionComponent = require('../components/PositionComponent');
-const VelocityComponent = require('../components/VelocityComponent');
-const RenderComponent = require('../components/RenderComponent');
+import System from '../System.js';
+import ParticleComponent from '../components/ParticleComponent.js';
+import PositionComponent from '../components/PositionComponent.js';
+import VelocityComponent from '../components/VelocityComponent.js';
+import RenderComponent from '../components/RenderComponent.js';
 
 const GRAVITY_Y = 98.2 * 1;
 
 class ParticleSystem extends System {
-  constructor(entityManager, options = {}, effectSystem = null) { // Added effectSystem
+  constructor(entityManager, options = {}, effectSystem = null) {
     super();
     this.entityManager = entityManager;
     this.options = options;
@@ -279,4 +279,4 @@ class ParticleSystem extends System {
   }
 }
 
-module.exports = ParticleSystem;
+export default ParticleSystem;

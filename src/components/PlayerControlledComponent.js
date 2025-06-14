@@ -1,4 +1,4 @@
-const Component = require('../Component');
+import Component from '../Component.js';
 
 class PlayerControlledComponent extends Component {
   constructor() {
@@ -17,4 +17,4 @@ class PlayerControlledComponent extends Component {
   }
 }
 
-module.exports = PlayerControlledComponent;
+export default PlayerControlledComponent;

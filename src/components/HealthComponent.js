@@ -1,4 +1,4 @@
-const Component = require('../Component');
+import Component from '../Component.js';
 
 class HealthComponent extends Component {
   constructor(maxHealth = 100, damageLevels = 3) { // damageLevels indicates how many stages of visual damage
@@ -69,4 +69,4 @@ class HealthComponent extends Component {
   }
 }
 
-module.exports = HealthComponent;
+export default HealthComponent;

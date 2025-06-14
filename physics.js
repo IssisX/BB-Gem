@@ -7,7 +7,7 @@
 // We provide a shim so legacy calls to .add continue to work *and*
 // migrate all internal usages to the new canonical .addBody().
 
-import * as CANNON from 'cannon-es'; // Changed from CDN URL
+import * as CANNON from 'cannon'; // Use the alias from import map
 
 export class PhysicsEngine {
   constructor() {

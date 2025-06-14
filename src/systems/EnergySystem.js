@@ -1,5 +1,5 @@
-const System = require('../System');
-const EnergyComponent = require('../components/EnergyComponent');
+import System from '../System.js';
+import EnergyComponent from '../components/EnergyComponent.js';
 
 class EnergySystem extends System {
   constructor() {
@@ -17,4 +17,4 @@ class EnergySystem extends System {
   }
 }
 
-module.exports = EnergySystem;
+export default EnergySystem;

@@ -1,22 +1,24 @@
-const System = require('../System');
-const HealthComponent = require('../components/HealthComponent');
-const PositionComponent = require('../components/PositionComponent'); // For effects on death
-const PhysicsComponent = require('../components/PhysicsComponent'); // To remove physics body on death
+import System from '../System.js';
+import HealthComponent from '../components/HealthComponent.js';
+import PositionComponent from '../components/PositionComponent.js';
+import PhysicsComponent from '../components/PhysicsComponent.js';
+// Required for checking if the dying entity is a player or AI for special effects
+import PlayerControlledComponent from '../components/PlayerControlledComponent.js';
+import AIControlledComponent from '../components/AIControlledComponent.js';
+
 
 class HealthSystem extends System {
-  constructor(entityManager, particleSystem) {
+  constructor(entityManager, particleSystem, effectSystem) { // Added effectSystem
     super();
     this.entityManager = entityManager;
     this.particleSystem = particleSystem;
-    this.effectSystem = effectSystem; // Can be set by constructor or setter too
-    this.gameEngine = null;
+    this.effectSystem = effectSystem;
+    this.gameEngine = null; // Set via gameEngineRef in update or a setter method
   }
 
-  // Helper for haptics, assuming gameEngine is available
   _hapticsEnabled() {
     return this.gameEngine && this.gameEngine.options && this.gameEngine.options.hapticFeedback;
   }
-
 
   update(entities, deltaTime, entityManager, ctx, camera, physicsEngine, controls, particleSystem, effectSystem, gameEngineRef) {
     const currentEntityManager = entityManager || this.entityManager;
@@ -25,13 +27,8 @@ class HealthSystem extends System {
     const currentEffectSystem = effectSystem || this.effectSystem;
     const currentGameEngine = gameEngineRef || this.gameEngine;
 
-    // Ensure gameEngine reference is stored if passed for the first time
-    if (currentGameEngine && !this.gameEngine) {
-        this.gameEngine = currentGameEngine;
-    }
-    if (currentEffectSystem && !this.effectSystem) {
-        this.effectSystem = currentEffectSystem;
-    }
+    if (currentGameEngine && !this.gameEngine) this.gameEngine = currentGameEngine;
+    if (currentEffectSystem && !this.effectSystem) this.effectSystem = currentEffectSystem; // Ensure it's set if passed late
 
 
     if (!currentEntityManager) {
@@ -46,8 +43,6 @@ class HealthSystem extends System {
 
       if (healthComp) {
         if (!healthComp.isAlive()) {
-          // console.log(`Entity ${entity.id.toString()} has died.`);
-
           const posComp = entity.getComponent(PositionComponent);
           if (posComp) {
             if (currentParticleSystem) {

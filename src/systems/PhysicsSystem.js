@@ -1,10 +1,12 @@
-const System = require('../System');
-const PositionComponent = require('../components/PositionComponent');
-const PhysicsComponent = require('../components/PhysicsComponent');
-const VelocityComponent = require('../components/VelocityComponent');
+import System from '../System.js';
+import PositionComponent from '../components/PositionComponent.js';
+import PhysicsComponent from '../components/PhysicsComponent.js';
+import VelocityComponent from '../components/VelocityComponent.js';
+// CANNON is not directly used here if physicsEngine instance handles all interactions
+// If direct CANNON calls were needed: import CANNON from 'cannon';
 
 class PhysicsSystem extends System {
-  constructor(physicsEngine, entityManager) { // Added entityManager if needed for body-entity mapping
+  constructor(physicsEngine, entityManager) {
     super();
     this.physicsEngine = physicsEngine;
     this.entityManager = entityManager; // May not be strictly needed here if physics bodies have entity IDs
@@ -65,4 +67,4 @@ class PhysicsSystem extends System {
   }
 }
 
-module.exports = PhysicsSystem;
+export default PhysicsSystem;

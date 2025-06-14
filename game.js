@@ -15,6 +15,7 @@ const AIControlledComponent = require('./src/components/AIControlledComponent');
 const HealthComponent = require('./src/components/HealthComponent');
 const EnergyComponent = require('./src/components/EnergyComponent');
 const WeaponComponent = require('./src/components/WeaponComponent');
+const AnimationComponent = require('./src/components/AnimationComponent');
 
 // Systems
 const PhysicsSystem = require('./src/systems/PhysicsSystem');
@@ -26,44 +27,36 @@ const EnergySystem = require('./src/systems/EnergySystem');
 const HealthSystem = require('./src/systems/HealthSystem');
 const ParticleSystem = require('./src/systems/ParticleSystem');
 const EffectSystem = require('./src/systems/EffectSystem');
-const AnimationSystem = require('./src/systems/AnimationSystem'); // Import AnimationSystem
-const AnimationComponent = require('./src/components/AnimationComponent'); // Import AnimationComponent for bot creation
+const AnimationSystem = require('./src/systems/AnimationSystem');
+const CANNON = require('cannon'); // Assuming cannon is mapped in importmap or accessible
+
 
 export class GameEngine {
-    constructor(canvas, options, dataManager) { // Added dataManager
+    constructor(canvas, options, dataManager) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
-        this.options = options;
-        this.dataManager = dataManager; // Store DataManager instance
+        this.options = options; // Game settings from app.js
+        this.dataManager = dataManager; // DataManager instance
         this.isRunning = false;
         this.isPaused = false;
         this.lastTime = 0;
         this.gameTime = 0;
-        this.maxGameTime = 120000; // 2 minutes
+        this.maxGameTime = 120000;
         
-        this.physics = null; // PhysicsEngine instance
+        this.physics = null;
         this.controls = null;
         this.camera = {
-            targetX: 0, // Logical target X (e.g., player position)
-            targetY: 0, // Logical target Y
-            currentX: 0, // Actual render X (includes shake)
-            currentY: 0, // Actual render Y (includes shake)
-            zoom: 1,
-            target: null, // Target entity
-
-            // Shake properties
-            shakeIntensity: 0,
-            shakeDuration: 0,
-            currentShakeTime: 0
+            targetX: 0, targetY: 0, currentX: 0, currentY: 0, zoom: 1,
+            target: null,
+            shakeIntensity: 0, shakeDuration: 0, currentShakeTime: 0
         };
         
         this.entityManager = new EntityManager();
         this.systems = [];
         this.systemUpdateOrder = [];
 
-        // Game Feel properties
         this.isSlowMotion = false;
-        this.slowMotionFactor = 0.5; // Default factor
+        this.slowMotionFactor = 0.5;
         this.slowMotionDuration = 0;
         this.currentSlowMotionTime = 0;
 
@@ -71,35 +64,32 @@ export class GameEngine {
         this.hitStopDuration = 0;
         this.currentHitStopTime = 0;
 
-        // Game state message properties
         this.countdownMessage = "";
-        this.countdownTimer = 0; // Not used in current setInterval approach, but could be for deltaTime based
         this.postGameMessage = "";
         this.showingPostGameMessage = false;
-        this.playerInputDisabled = false; // To disable input during countdown
+        this.playerInputDisabled = false;
 
-        this.gameStats = {
-            damage: 0,
-            hits: 0,
-            shots: 0,
-            startTime: 0
-        };
-        
+        this.gameStats = { damage: 0, hits: 0, shots: 0, startTime: 0 };
         this.eventListeners = {};
         
+        this.currentMapData = null; // To store loaded map data
+
         this.init();
     }
 
     async init() {
         this.setupCanvas();
         
-        this.physics = new PhysicsEngine(this.options); // Assuming PhysicsEngine constructor doesn't take options in the simplified version
-        this.controls = new ControlsManager(this, this.options);
+        // Pass necessary options to PhysicsEngine if its constructor uses them
+        this.physics = new PhysicsEngine(this.options);
+        // Pass gameEngine instance (this) and options to ControlsManager.
+        // Also pass the callback for adaptive UI.
+        this.controls = new ControlsManager(this, this.options, this.options.onInputTypeChange);
 
         // Initialize Systems
         const effectSystem = new EffectSystem(this.entityManager);
         const particleSystem = new ParticleSystem(this.entityManager, { particleQuality: this.options.quality }, effectSystem);
-        const animationSystem = new AnimationSystem(this.entityManager); // Instantiate AnimationSystem
+        const animationSystem = new AnimationSystem(this.entityManager);
         const renderSystem = new RenderSystem(this.ctx, this.entityManager, this.camera, this);
 
         this.systems.push(new PlayerInputSystem(this.controls));
@@ -110,47 +100,40 @@ export class GameEngine {
         this.systems.push(new HealthSystem(this.entityManager, particleSystem, effectSystem));
         this.systems.push(particleSystem);
         this.systems.push(effectSystem);
-        this.systems.push(animationSystem); // Add AnimationSystem to the list
+        this.systems.push(animationSystem);
         this.systems.push(renderSystem);
 
         this.systemUpdateOrder = [
-            PlayerInputSystem,
-            AISystem,
-            EnergySystem,
-            PhysicsSystem,
-            CollisionSystem,
-            HealthSystem,
-            ParticleSystem,
-            EffectSystem,
-            AnimationSystem, // Add AnimationSystem to update order (before RenderSystem)
-            RenderSystem,
+            PlayerInputSystem, AISystem, EnergySystem, PhysicsSystem, CollisionSystem,
+            HealthSystem, ParticleSystem, EffectSystem, AnimationSystem, RenderSystem,
         ].map(SystemClass => this.systems.find(s => s instanceof SystemClass)).filter(s => s);
 
-        // Event listeners from physics engine
         this.physics.on('botHit', this.handleBotHit.bind(this));
         this.physics.on('projectileHitWall', this.handleProjectileHitWall.bind(this));
 
-        // Load a default level or wait for app.js to call loadLevel
-        this.currentMapData = null; // To store loaded map data
-        this.loadLevel('arena_basic_v1', 'player_starter_balanced', 'enemy_grunt_blaster_v1');
+        // Load a default level. App.js can call loadLevel with different IDs to change maps/bots.
+        const defaultMapId = this.options.defaultMapId || 'arena_basic_v1';
+        const defaultPlayerConfigId = this.options.defaultPlayerConfigId || 'player_starter_balanced';
+        const defaultEnemyConfigId = this.options.defaultEnemyConfigId || 'enemy_grunt_blaster_v1';
+        this.loadLevel(defaultMapId, defaultPlayerConfigId, defaultEnemyConfigId);
         
         this.setupEventListeners();
-        
         console.log('Game engine initialized, level loading initiated.');
     }
 
     loadLevel(mapId, playerBotConfigId, enemyBotConfigId) {
         if (!this.dataManager) {
-            console.error("DataManager not available to load level.");
+            console.error("DataManager not available. Cannot load level.");
             return;
         }
-        this.currentMapData = this.dataManager.getMapDataById(mapId);
-        if (!this.currentMapData) {
+        const mapData = this.dataManager.getMapDataById(mapId);
+        if (!mapData) {
             console.error(`Map data for ${mapId} not found.`);
             return;
         }
+        this.currentMapData = mapData;
 
-        // TODO: Clear existing entities (obstacles, previous bots) from EntityManager and PhysicsEngine
+        // 1. Clear existing entities
         this.entityManager.getAllEntities().forEach(entity => {
             const physicsComp = entity.getComponent(PhysicsComponent);
             if (physicsComp && physicsComp.body) {
@@ -158,169 +141,165 @@ export class GameEngine {
             }
             this.entityManager.removeEntity(entity.id);
         });
+        // Reset game state for the new level
+        this.gameTime = 0;
+        this.playerInputDisabled = false; // Re-enable input before countdown starts it
+        // Clear any active countdown/post-game messages
+        this.countdownMessage = "";
+        this.showingPostGameMessage = false;
+        this.postGameMessage = "";
 
 
-        // Update RenderSystem with new background info (if RenderSystem supports it)
+        // 2. Update RenderSystem with new map info
         const renderSys = this.systems.find(s => s instanceof RenderSystem);
-        if (renderSys && typeof renderSys.setMapBackground === 'function') {
-            renderSys.setMapBackground(this.currentMapData.background);
-        } else if (renderSys) { // Fallback for existing drawArenaBackground
-            renderSys.mapDimensions = this.currentMapData.dimensions; // Pass dimensions
+        if (renderSys) {
+            if (typeof renderSys.setMap === 'function') {
+                renderSys.setMap(this.currentMapData);
+            } else {
+                renderSys.mapDimensions = this.currentMapData.dimensions;
+                renderSys.mapBackgroundInfo = this.currentMapData.background;
+            }
         }
 
-
-        // Create obstacles from map data
+        // 3. Create obstacles
         if (this.currentMapData.obstacles) {
             this.currentMapData.obstacles.forEach(obsData => {
                 this.createObstacle(obsData);
             });
         }
 
-        // Create player and enemy bots using configurations and start positions
-        const playerConfig = this.dataManager.getBotConfigById(playerBotConfigId);
-        const enemyConfig = this.dataManager.getBotConfigById(enemyBotConfigId);
+        // 4. Create player and enemy bots
+        const playerBotConfig = this.dataManager.getBotConfigById(playerBotConfigId);
+        const enemyBotConfig = this.dataManager.getBotConfigById(enemyBotConfigId);
 
-        if (playerConfig && this.currentMapData.playerStartPositions[0]) {
-            this.createPlayerBot(playerConfig, this.currentMapData.playerStartPositions[0]);
+        const playerStartPos = this.currentMapData.playerStartPositions?.[0] || { x: -200, y: 0, angle: 0 }; // Default start
+        const enemyStartPos = this.currentMapData.playerStartPositions?.[1] || { x: 200, y: 0, angle: 180 }; // Default start
+
+        if (playerBotConfig) {
+            this.createPlayerBot(playerBotConfig, playerStartPos);
         } else {
-            console.error("Player config or start position not found for level setup.");
+            console.error(`Player BotConfig '${playerBotConfigId}' not found.`);
         }
 
-        if (enemyConfig && this.currentMapData.playerStartPositions[1]) {
-            this.createEnemyBot(enemyConfig, this.currentMapData.playerStartPositions[1]);
+        if (enemyBotConfig) {
+            this.createEnemyBot(enemyBotConfig, enemyStartPos);
         } else {
-            console.error("Enemy config or start position not found for level setup.");
+            console.error(`Enemy BotConfig '${enemyBotConfigId}' not found.`);
         }
-        console.log(`Level ${mapId} loaded with bots.`);
+        console.log(`Level ${mapId} loaded with bots. Player at (${playerStartPos.x}, ${playerStartPos.y}), Enemy at (${enemyStartPos.x}, ${enemyStartPos.y})`);
+
+        // After loading level, if game is meant to start immediately, call start() which includes countdown
+        // this.start(); // Or app.js calls start after loadLevel completes
     }
 
     createObstacle(obstacleData) {
-        const entity = this.entityManager.createEntity(obstacleData.id || `obstacle_${Math.random().toString(36).substr(2, 9)}`);
-        entity.addComponent(new PositionComponent(obstacleData.x, obstacleData.y));
+        const entity = this.entityManager.createEntity(obstacleData.obstacleId || `obstacle_${Math.random().toString(36).substr(2, 9)}`);
+
+        entity.addComponent(new PositionComponent(obstacleData.x, obstacleData.y, obstacleData.z || 0));
 
         const renderInfo = obstacleData.render || {};
+        const visualWidth = renderInfo.width || obstacleData.width || 50;
+        const visualHeight = renderInfo.height || obstacleData.height || 50;
+
         entity.addComponent(new RenderComponent(
             renderInfo.shape || 'rectangle',
             renderInfo.color || '#777777',
-            renderInfo.sprite,
-            true,
-            0, // zOrder for obstacles
-            renderInfo.size || obstacleData.width // Use width as default size if not specified
+            renderInfo.sprite, true, 0, visualWidth
         ));
+        // If RenderComponent needs separate height for non-square shapes:
+        // if(renderInfo.shape === 'rectangle') entity.getComponent(RenderComponent).height = visualHeight;
 
         const physicsInfo = obstacleData.physics || {};
+        const physicalWidth = obstacleData.width || 50;
+        const physicalDepth = obstacleData.depth || obstacleData.height || 50;
+        const physicalHeight = physicsInfo.bodyHeight || 50; // Actual height of the physics body in 3D space (Cannon Y)
+
         const bodyOptions = {
-            mass: physicsInfo.isStatic === false ? (physicsInfo.mass || 50) : 0, // Static if mass is 0
-            position: new CANNON.Vec3(obstacleData.x, obstacleData.z !== undefined ? obstacleData.z : (obstacleData.height || 50)/2, obstacleData.y), // Game Y to Physics Z
-            fixedRotation: true, // Most obstacles probably don't rotate wildly
-            linearDamping: 0.3, // Some damping
-            angularDamping: 0.9, // High angular damping for obstacles
-            material: this.physics.materials.wallMaterial // Default material for obstacles
+            mass: physicsInfo.isStatic === false && physicsInfo.mass !== undefined ? physicsInfo.mass : 0,
+            position: new CANNON.Vec3(obstacleData.x, physicalHeight / 2, obstacleData.y),
+            fixedRotation: physicsInfo.fixedRotation !== undefined ? physicsInfo.fixedRotation : true,
+            linearDamping: physicsInfo.linearDamping !== undefined ? physicsInfo.linearDamping : 0.5,
+            angularDamping: physicsInfo.angularDamping !== undefined ? physicsInfo.angularDamping : 0.8,
+            material: this.physics.materials.wallMaterial // TODO: Make material configurable from JSON
         };
 
         let shape;
         const shapeType = physicsInfo.shape || (obstacleData.radius ? 'sphere' : 'box');
         if (shapeType === 'sphere') {
-            shape = new CANNON.Sphere(obstacleData.radius);
-        } else { // Default to box
-            shape = new CANNON.Box(new CANNON.Vec3(
-                (obstacleData.width || 50) / 2,
-                (obstacleData.depth || obstacleData.width || 50) / 2, // Assuming depth = width if not specified for physics body
-                (obstacleData.height || 50) / 2  // Game height is physics Z extent
-            ));
-             // Cannon.js Y is up, so height for physics body is different from visual height if top-down
-             // For a top-down game, the visual "height" of an obstacle might be its Z-extent in physics.
-             // Let's assume depth for physics is visual height for now.
-             // And physics height (Y) is some arbitrary value or half of visual height if origin is at base.
-             // This needs careful alignment with how physics world is set up.
-             // For now, using obstacleData.height as the vertical extent (Cannon's Y).
-             bodyOptions.position.y = (obstacleData.height || 50) / 2; // Center of mass vertically
-             shape = new CANNON.Box(new CANNON.Vec3( (obstacleData.width || 50)/2, (obstacleData.height || 50)/2, (obstacleData.depth || 50)/2 ));
-
+            shape = new CANNON.Sphere(obstacleData.radius || physicalWidth/2);
+             bodyOptions.position.y = obstacleData.radius || physicalWidth/2;
+        } else if (shapeType === 'cylinder') {
+            shape = new CANNON.Cylinder(obstacleData.radius || physicalWidth/2, obstacleData.radius || physicalWidth/2, physicalHeight, 12);
+        } else {
+             shape = new CANNON.Box(new CANNON.Vec3(physicalWidth / 2, physicalHeight / 2, physicalDepth / 2));
         }
 
         const body = new CANNON.Body(bodyOptions);
         body.addShape(shape);
         if (obstacleData.rotation) {
-            body.quaternion.setFromEuler(0, obstacleData.rotation, 0); // Assuming Y-up rotation for map objects
+            body.quaternion.setFromEuler(0, obstacleData.rotation * Math.PI / 180, 0);
         }
-        body.userData = { entityId: entity.id, type: 'obstacle' };
+        body.userData = { entityId: entity.id, type: 'obstacle', ...obstacleData };
         this.physics.world.addBody(body);
 
         entity.addComponent(new PhysicsComponent(body, {
             mass: bodyOptions.mass,
-            size: { width: obstacleData.width, height: obstacleData.height, depth: obstacleData.depth, radius: obstacleData.radius },
+            size: { width: physicalWidth, height: physicalHeight, depth: physicalDepth, radius: obstacleData.radius },
             linearDamping: bodyOptions.linearDamping,
             angularDamping: bodyOptions.angularDamping,
             friction: physicsInfo.friction,
             restitution: physicsInfo.restitution
         }));
+        return entity;
     }
-
 
     setupCanvas() {
         const rect = this.canvas.getBoundingClientRect();
         this.canvas.width = rect.width * window.devicePixelRatio;
         this.canvas.height = rect.height * window.devicePixelRatio;
         this.ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-        
         this.canvas.style.width = rect.width + 'px';
         this.canvas.style.height = rect.height + 'px';
-        
         this.ctx.imageSmoothingEnabled = this.options.quality !== 'low';
     }
 
     setupEventListeners() {
         const pauseBtn = document.getElementById('pause-btn');
-        if (pauseBtn) {
-            pauseBtn.addEventListener('click', () => this.togglePause());
-        }
+        if (pauseBtn) pauseBtn.addEventListener('click', () => this.togglePause());
         this.on('swipeDown', () => this.togglePause());
         this.on('swipeUp', () => {
-            // This should be handled by PlayerInputSystem listening for an event or checking a control state
-            // For now, we can try to find the player entity and set a component or call a method.
             const playerEntity = this.entityManager.getEntityById('player');
             if(playerEntity && playerEntity.hasComponent(PlayerControlledComponent)) {
-                // Example: playerEntity.addComponent(new ActivateSpecialAbilityComponent());
-                // Or PlayerInputSystem checks for this gesture and sets velocity/state on PhysicsComponent/WeaponComponent
                 console.log("Swipe up detected for player special ability - system should handle this.");
-                // this.activateSpecialAbility(); // Old direct call
             }
         });
     }
 
     createBotEntity(entityId, botConfig, initialPos, isPlayer = false) {
         if (!this.dataManager) {
-            console.error("DataManager not available in GameEngine. Cannot create bot.");
+            console.error("DataManager not available. Cannot create bot.");
             return null;
         }
-
         const chassisData = this.dataManager.getPartById(botConfig.chassisId);
-        const armorData = botConfig.armorId ? this.dataManager.getPartById(botConfig.armorId) : null;
-        // Assuming one weapon for now, can be extended to multiple
-        const weaponData = botConfig.weaponIds && botConfig.weaponIds.length > 0
-                           ? this.dataManager.getPartById(botConfig.weaponIds[0])
-                           : null;
-
         if (!chassisData) {
-            console.error(`Chassis with ID ${botConfig.chassisId} not found. Cannot create bot ${entityId}.`);
+            console.error(`Chassis ID ${botConfig.chassisId} not found for bot ${entityId}.`);
             return null;
         }
-        if (!weaponData) {
-            console.warn(`Weapon for bot ${entityId} not found. Proceeding without weapon.`);
-        }
+        const armorData = botConfig.armorId ? this.dataManager.getPartById(botConfig.armorId) : null;
+        const weaponDataArray = (botConfig.weaponIds || [])
+            .map(id => this.dataManager.getPartById(id))
+            .filter(p => p); // Filter out nulls if a weapon ID isn't found
 
         const entity = this.entityManager.createEntity(entityId);
 
-        // Calculate combined stats
         let totalHealth = chassisData.stats.baseHealth;
         let totalMass = chassisData.stats.mass;
         if (armorData && armorData.stats.addedHealth) totalHealth += armorData.stats.addedHealth;
         if (armorData && armorData.stats.addedMass) totalMass += armorData.stats.addedMass;
-        
+
         const physicsOptions = {
             mass: totalMass,
-            size: chassisData.stats.size || { width: 60, height: 80, depth: 60, radius: 30 }, // Default size if not in chassis
+            size: chassisData.stats.size || { width: 60, height: 80, depth: 60 },
             accelerationForce: chassisData.stats.accelerationForce,
             maxSpeed: chassisData.stats.maxSpeed,
             linearDamping: chassisData.stats.linearDamping,
@@ -331,260 +310,192 @@ export class GameEngine {
         
         const botBody = this.physics.createBot(entityId, initialPos.x, initialPos.y, {
             width: physicsOptions.size.width,
-            height: physicsOptions.size.height,
+            height: physicsOptions.size.depth, // Use depth from chassis size for physics body height
             mass: physicsOptions.mass,
-            // Pass other physics relevant options if createBot uses them (like maxSpeed, acceleration from chassisData.stats for userData)
-            maxSpeed: chassisData.stats.maxSpeed,
-            acceleration: chassisData.stats.accelerationForce, // Note: physics.createBot might use 'acceleration' not 'accelerationForce'
+            maxSpeed: physicsOptions.maxSpeed,
+            acceleration: physicsOptions.accelerationForce,
             linearDamping: physicsOptions.linearDamping,
             angularDamping: physicsOptions.angularDamping
         });
-        botBody.userData.entityId = entityId;
+        botBody.userData = { entityId: entityId };
+        if (initialPos.angle !== undefined) { // Set initial rotation from map data
+            botBody.quaternion.setFromEuler(0, initialPos.angle * Math.PI / 180, 0); // Assuming Y-up
+        }
+
 
         entity.addComponent(new PositionComponent(initialPos.x, initialPos.y))
               .addComponent(new VelocityComponent())
               .addComponent(new PhysicsComponent(botBody, physicsOptions));
 
-        // Setup RenderComponent with layers
         const renderComp = new RenderComponent(
-            chassisData.renderShape || 'bot', // Fallback shape if no sprites/layers
-            isPlayer ? '#00ffff' : '#ff0040', // Base color for the bot entity
-            chassisData.sprite,               // Main sprite (chassis)
-            true,                             // isVisible
-            1,                                // zOrder
-            chassisData.stats.renderSize || 30 // Base size
+            chassisData.renderShape || 'bot',
+            isPlayer ? (botConfig.cosmeticOverrides?.primaryColor || '#00ffff') : (botConfig.cosmeticOverrides?.primaryColor ||'#ff0040'),
+            botConfig.cosmeticOverrides?.chassisSprite || chassisData.sprite,
+            true, 1, chassisData.stats.renderSize || 30
         );
 
-        // Add chassis as the first layer
         renderComp.layers.push({
-            partType: 'chassis',
-            sprite: chassisData.sprite,
-            offsetX: 0, offsetY: 0, rotation: 0,
-            zOrderOffset: 0, // Base layer for chassis
-            width: chassisData.stats.renderSize || 60, // Use specific or default sizes
+            partType: 'chassis', sprite: botConfig.cosmeticOverrides?.chassisSprite || chassisData.sprite,
+            offsetX: 0, offsetY: 0, rotation: 0, zOrderOffset: 0,
+            width: chassisData.stats.renderSize || 60,
             height: chassisData.stats.renderSize || (chassisData.stats.size?.height || 60)
         });
 
-        // Add weapon layers (assuming one weapon for now)
-        if (weaponData && weaponData.sprite) {
-            const weaponAttachPoint = chassisData.attachmentPoints?.weaponSlot1 || {x:0, y:0, defaultRotation:0};
-            renderComp.layers.push({
-                partType: 'weapon',
-                sprite: weaponData.sprite,
-                offsetX: weaponAttachPoint.x,
-                offsetY: weaponAttachPoint.y,
-                rotation: weaponAttachPoint.defaultRotation || 0,
-                zOrderOffset: 1, // Weapon on top of chassis
-                width: weaponData.render?.width || weaponData.stats.projectileSize * 2 || 20, // Estimate size
-                height: weaponData.render?.height || weaponData.stats.projectileSize * 4 || 40,
-                // color: weaponData.render?.color // Optional: if weapon part itself has a tint on its sprite
-            });
-        }
-        
-        // TODO: Add armor layers if they have visual sprites
+        weaponDataArray.forEach((weaponData, index) => {
+            if (weaponData && weaponData.sprite) {
+                const slotId = `weaponSlot${index + 1}`; // e.g. weaponSlot1
+                const attachPoint = chassisData.attachmentPoints?.[slotId] || {x:0, y: index * 5, defaultRotation:0}; // Basic fallback if slot not defined
+                renderComp.layers.push({
+                    partType: `weapon_${index}`, sprite: weaponData.sprite,
+                    offsetX: attachPoint.x, offsetY: attachPoint.y, rotation: attachPoint.defaultRotation || 0,
+                    zOrderOffset: 1 + index,
+                    width: weaponData.renderInfo?.width || weaponData.stats.projectileSize * 2 || 20,
+                    height: weaponData.renderInfo?.height || weaponData.stats.projectileSize * 4 || 40,
+                });
+                // For now, only use the first weapon's stats for the WeaponComponent
+                if (index === 0) {
+                     entity.addComponent(new WeaponComponent(
+                        weaponData.stats.fireRate, weaponData.stats.projectileType || weaponData.renderInfo.shape,
+                        weaponData.stats.projectileSpeed, weaponData.stats.damage,
+                        weaponData.stats.projectileSize, weaponData.stats.projectileColor,
+                        weaponData.stats.projectileLifetime * 1000, weaponData.stats.energyCost,
+                        weaponData.stats.spread, weaponData.renderInfo
+                    ));
+                }
+            }
+        });
 
-        entity.addComponent(renderComp);
-        entity.addComponent(new HealthComponent(totalHealth))
+        entity.addComponent(renderComp)
+              .addComponent(new HealthComponent(totalHealth))
               .addComponent(new EnergyComponent(chassisData.stats.baseEnergy, chassisData.stats.energyRegenRate || 10));
 
-        if (isPlayer) {
-            entity.addComponent(new PlayerControlledComponent());
-        } else {
-            entity.addComponent(new AIControlledComponent('seeking', null));
-        }
-
-        if (weaponData) {
-            entity.addComponent(new WeaponComponent(
-                weaponData.stats.fireRate,
-                weaponData.stats.projectileType || weaponData.render.shape, // Use render shape as fallback
-                weaponData.stats.projectileSpeed,
-                weaponData.stats.damage,
-                weaponData.stats.projectileSize,
-                weaponData.stats.projectileColor,
-                weaponData.stats.projectileLifetime * 1000,
-                weaponData.stats.energyCost,
-                weaponData.stats.spread,
-                weaponData.render // Pass the render object from JSON
-            ));
-        }
+        if (isPlayer) entity.addComponent(new PlayerControlledComponent());
+        else entity.addComponent(new AIControlledComponent(botConfig.aiBehaviorHint || 'seeking', null));
 
         entity.addComponent(new AnimationComponent({
             'fireRecoil': {
-                targetProperties: { renderOffsetY: - (chassisData.stats.renderSize || 30) * 0.2, animationScale: 0.95 },
-                duration: 0.075,
-                easingFunction: 'easeOutQuad',
-                resetsToOriginal: true
+                targetProperties: { renderOffsetY: - (chassisData.stats.renderSize || 30) * 0.1, animationScale: 0.97 },
+                duration: 0.075, easingFunction: 'easeOutQuad', resetsToOriginal: true
             },
             'hitReact': {
                 targetProperties: { animationTintColor: 'rgba(255,100,100,0.6)' },
-                duration: 0.15,
-                easingFunction: 'linear',
-                resetsToOriginal: true
+                duration: 0.15, easingFunction: 'linear', resetsToOriginal: true
             }
         }));
-
         return entity;
     }
 
     createPlayerBot(botConfig, startPosition) {
-        const playerEntity = this.createBotEntity('player', botConfig, startPosition || {x: -100, y: 0}, true);
+        const playerEntity = this.createBotEntity('player', botConfig, startPosition, true);
         if (playerEntity) {
             this.camera.target = playerEntity;
-            // Set initial camera position to player start
-            this.camera.targetX = playerEntity.getComponent(PositionComponent).x;
-            this.camera.targetY = playerEntity.getComponent(PositionComponent).y;
-            this.camera.currentX = this.camera.targetX;
-            this.camera.currentY = this.camera.targetY;
+            const posComp = playerEntity.getComponent(PositionComponent);
+            this.camera.targetX = posComp.x; this.camera.targetY = posComp.y;
+            this.camera.currentX = posComp.x; this.camera.currentY = posComp.y;
         }
     }
 
     createEnemyBot(botConfig, startPosition) {
-        this.createBotEntity('enemy', botConfig, startPosition || {x: 100, y: 0}, false);
+        this.createBotEntity('enemy', botConfig, startPosition, false);
     }
 
     start() {
-                            duration: 0.1,
-                            easingFunction: 'easeOutQuad',
-                            resetsToOriginal: true
-                        },
-                        'hitReact': {
-                            targetProperties: { animationTintColor: 'rgba(255,100,100,0.6)' },
-                            duration: 0.15,
-                            easingFunction: 'linear',
-                            resetsToOriginal: true
-                        }
-                   }));
-    }
-
-    start() {
-        this.isRunning = true; // Game loop will start processing updates
-        this.isPaused = false; // Ensure not paused
+        this.isRunning = true;
+        this.isPaused = false;
         this.gameTime = 0;
         this.gameStats.startTime = Date.now();
-        
-        this.startMatchCountdown(); // Initiate countdown before regular game loop takes full effect for gameplay
-        
-        // gameLoop is already started by App.js typically, or should be if this is the main entry.
-        // if(!this.gameLoopRequestId) this.gameLoop();
-
+        this.startMatchCountdown();
         this.updateGameTimer();
-        
-        // console.log('Game started sequence initiated'); // More accurate log
     }
 
     startMatchCountdown() {
-        this.playerInputDisabled = true; // Disable player input
-        // PlayerInputSystem should check this flag or be disabled via another mechanism
+        this.playerInputDisabled = true;
         const messages = ['3', '2', '1', 'FIGHT!'];
         let currentMessageIndex = 0;
         this.countdownMessage = messages[currentMessageIndex];
+        const renderSys = this.systems.find(s => s instanceof RenderSystem);
+        if(renderSys) renderSys.updateDOMUI(this.entityManager); // Initial display of '3'
 
         const countdownInterval = setInterval(() => {
             currentMessageIndex++;
             if (currentMessageIndex < messages.length) {
                 this.countdownMessage = messages[currentMessageIndex];
+                if(renderSys) renderSys.updateDOMUI(this.entityManager);
             } else {
                 clearInterval(countdownInterval);
-                this.countdownMessage = ""; // Clear message
-                this.playerInputDisabled = false; // Enable player input
+                this.countdownMessage = "";
+                if(renderSys) renderSys.updateDOMUI(this.entityManager);
+                this.playerInputDisabled = false;
                 console.log('FIGHT!');
-                // Actual game logic (like AI starting, etc.) effectively begins now as systems update.
             }
-        }, 1000); // Display each message for 1 second
+        }, 1000);
     }
-
 
     gameLoop(currentTime = 0) {
         if (!this.isRunning) return;
         
-        const actualDeltaTime = (currentTime - this.lastTime) / 1000; // Actual time elapsed
+        const actualDeltaTime = (currentTime - this.lastTime) / 1000;
         this.lastTime = currentTime;
         let currentDeltaTime = actualDeltaTime;
 
-        // Handle Hit Stop
         if (this.isHitStop) {
             this.currentHitStopTime -= actualDeltaTime;
-            if (this.currentHitStopTime <= 0) {
-                this.isHitStop = false;
-            }
-            // Effectively pause most updates by returning early or using a minimal deltaTime
-            // For a more pronounced effect, we might only update specific animations or nothing.
-            // Here, we pass a very small deltaTime or skip certain system updates.
-            // For simplicity, let's make deltaTime effectively zero for hit stop.
-            currentDeltaTime = 0.00001; // Or just return and skip updates for true freeze
-            if (this.isHitStop) { // Re-check as it might have been turned off
-                 requestAnimationFrame(this.gameLoop.bind(this)); // Keep the loop going
-                 // To truly pause, you might want to skip system updates entirely for some frames
-                 // For now, a tiny deltaTime will slow things dramatically.
+            if (this.currentHitStopTime <= 0) this.isHitStop = false;
+            currentDeltaTime = 0.00001;
+            if (this.isHitStop) {
+                 requestAnimationFrame(this.gameLoop.bind(this));
+                 return; // Effectively freeze most game logic
             }
         }
 
-        // Handle Slow Motion
-        if (this.isSlowMotion && !this.isHitStop) { // Don't compound with hit stop's own time effect
+        if (this.isSlowMotion && !this.isHitStop) {
             currentDeltaTime *= this.slowMotionFactor;
-            this.currentSlowMotionTime -= actualDeltaTime; // Deplete duration with actual time
-            if (this.currentSlowMotionTime <= 0) {
-                this.isSlowMotion = false;
-            }
+            this.currentSlowMotionTime -= actualDeltaTime;
+            if (this.currentSlowMotionTime <= 0) this.isSlowMotion = false;
         }
         
         if (!this.isPaused) {
-            this.update(currentDeltaTime); // Main ECS update with potentially modified deltaTime
-            
-            this.gameTime += actualDeltaTime * 1000; // Game time progresses normally
+            this.update(currentDeltaTime);
+            this.gameTime += actualDeltaTime * 1000;
             this.checkGameEnd();
         }
-        
         requestAnimationFrame(this.gameLoop.bind(this));
     }
 
-    triggerSlowMotion(factor = 0.5, duration = 1000) { // factor (0.1-1.0), duration in ms
-        if (this.options.quality === 'low') return; // Option to disable slow-mo
-
+    triggerSlowMotion(factor = 0.5, duration = 1000) {
+        if (this.options.quality === 'low' && !this.options.allowSlowMoOnLow) return;
         this.slowMotionFactor = factor;
-        this.slowMotionDuration = duration / 1000; // Convert ms to seconds
+        this.slowMotionDuration = duration / 1000;
         this.currentSlowMotionTime = this.slowMotionDuration;
         this.isSlowMotion = true;
     }
 
-    triggerHitStop(duration = 100) { // duration in ms
-        if (this.options.quality === 'low') return;
-
-        this.hitStopDuration = duration / 1000; // Convert ms to seconds
+    triggerHitStop(duration = 100) {
+        if (this.options.quality === 'low' && !this.options.allowHitStopOnLow) return;
+        this.hitStopDuration = duration / 1000;
         this.currentHitStopTime = this.hitStopDuration;
         this.isHitStop = true;
     }
 
-    update(deltaTime) { // deltaTime here is the potentially modified game simulation deltaTime
+    update(deltaTime) {
         const allEntities = this.entityManager.getAllEntities();
-
-        // Pass playerInputDisabled state to PlayerInputSystem
         const playerInputSystem = this.systems.find(s => s instanceof PlayerInputSystem);
         if (playerInputSystem && typeof playerInputSystem.setInputDisabled === 'function') {
             playerInputSystem.setInputDisabled(this.playerInputDisabled);
         }
 
-        for (const system of this.systemUpdateOrder) {
-            system.update(allEntities, deltaTime, this.entityManager, this.ctx, this.camera, this.physics, this.controls,
-                          this.systems.find(s => s instanceof ParticleSystem),
-                          this.systems.find(s => s instanceof EffectSystem),
-                          this);
-        }
+        const particleSys = this.systems.find(s => s instanceof ParticleSystem);
+        const effectSys = this.systems.find(s => s instanceof EffectSystem);
 
-        // Old direct update calls are removed:
-        // this.updatePlayerBot(inputState, deltaTime);
-        // this.updateEnemyAI(deltaTime);
-        // this.physics.update(deltaTime); // This is now called within PhysicsSystem
-        // this.updateEntitiesFromPhysics(physicsData); // This is now done by PhysicsSystem
-        
-        this.updateCamera(deltaTime); // Camera can still be updated here or by RenderSystem
-        // this.updateParticles(deltaTime);
-        // this.updateUI();
+        for (const system of this.systemUpdateOrder) {
+            system.update(allEntities, deltaTime, this.entityManager, this.ctx, this.camera,
+                          this.physics, this.controls, particleSys, effectSys, this);
+        }
+        this.updateCamera(deltaTime);
     }
 
     triggerScreenShake(intensity, duration) {
-        if (this.options.quality === 'low') return; // Option to disable shake on low quality
-
+        if (this.options.quality === 'low' && !this.options.allowScreenShakeOnLow) return;
         this.camera.shakeIntensity = intensity;
         this.camera.shakeDuration = duration;
         this.camera.currentShakeTime = duration;
@@ -594,205 +505,142 @@ export class GameEngine {
         if (this.camera.target) {
             const targetPosition = this.camera.target.getComponent(PositionComponent);
             if (targetPosition) {
-                const lerpFactor = 5 * deltaTime; // Smooth follow
+                const lerpFactor = 5 * deltaTime;
                 this.camera.targetX += (targetPosition.x - this.camera.targetX) * lerpFactor;
                 this.camera.targetY += (targetPosition.y - this.camera.targetY) * lerpFactor;
             }
         }
-
-        // Apply screen shake
         if (this.camera.currentShakeTime > 0) {
-            const intensity = this.camera.shakeIntensity * (this.camera.currentShakeTime / this.camera.shakeDuration); // Fade shake
+            const intensity = this.camera.shakeIntensity * (this.camera.currentShakeTime / this.camera.shakeDuration);
             this.camera.currentX = this.camera.targetX + (Math.random() - 0.5) * intensity * 2;
             this.camera.currentY = this.camera.targetY + (Math.random() - 0.5) * intensity * 2;
-            
             this.camera.currentShakeTime -= deltaTime;
             if (this.camera.currentShakeTime <= 0) {
                 this.camera.shakeIntensity = 0;
-                this.camera.currentX = this.camera.targetX; // Reset to exact target
+                this.camera.currentX = this.camera.targetX;
                 this.camera.currentY = this.camera.targetY;
             }
         } else {
             this.camera.currentX = this.camera.targetX;
             this.camera.currentY = this.camera.targetY;
         }
-        // RenderSystem will use camera.currentX and camera.currentY
     }
-
-    // updateParticles is obsolete. ParticleSystem will handle this.
-
-    // updateUI() is now handled by RenderSystem.updateDOMUI()
 
     updateGameTimer() {
         if (!this.isRunning) return;
-        
         const timeLeft = Math.max(0, this.maxGameTime - this.gameTime);
         const minutes = Math.floor(timeLeft / 60000);
         const seconds = Math.floor((timeLeft % 60000) / 1000);
-        
         const timerElement = document.getElementById('game-timer');
-        if (timerElement) {
-            timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        }
-        
-        setTimeout(() => this.updateGameTimer(), 100);
+        if (timerElement) timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        setTimeout(() => this.updateGameTimer(), 1000); // Update every second
     }
 
-    render() {
-        // All rendering is now handled by RenderSystem, which is called during the main update loop.
-        // This method is now effectively empty.
-    }
+    render() { /* Effectively empty, RenderSystem handles drawing */ }
 
-    // All drawing methods, old particle creation methods, and old direct action methods
-    // (like firePlayerWeapon, activateSpecialAbility) are now removed as their logic
-    // is handled by respective ECS systems.
-
-    // Event handlers can remain if they are for game-level events or stats.
     handleBotHit(data) {
         const { botId, damage, position } = data;
         const entity = this.entityManager.getEntityById(botId);
-
         if (entity) {
-            // Health reduction is handled by CollisionSystem.
-            // This handler is now primarily for stats and sound.
             if (botId === 'enemy') {
                 this.gameStats.hits++;
                 this.gameStats.damage += damage;
             }
-            
-            // Particle effect calls are now in CollisionSystem.
-            // This handler could still play sounds or trigger other non-ECS responses.
-            this.options.audioManager.playSound('hit');
-            if (this.options.hapticFeedback) this.options.audioManager.vibrate([30, 10, 30]);
+            if(this.options.audioManager) this.options.audioManager.playSound('hit');
+            if (this.options.hapticFeedback && navigator.vibrate) navigator.vibrate([30, 10, 30]);
         }
     }
 
     handleProjectileHitWall(data) {
-        const { projectileId, position } = data;
-        // Particle effect calls are now in CollisionSystem.
-        // This handler could play sounds for wall hits.
-        // this.options.audioManager.playSound('wallHit'); // Example
+        // if(this.options.audioManager) this.options.audioManager.playSound('wallHit');
     }
 
-    checkGameEnd() { // This logic remains, as it's high-level game state.
+    checkGameEnd() {
+        if (!this.isRunning || this.showingPostGameMessage) return; // Don't check if game already ended or is ending
+
         const playerEntity = this.entityManager.getEntityById('player');
         const enemyEntity = this.entityManager.getEntityById('enemy');
-
         let gameOver = false;
         let victory = false;
 
         const playerHealth = playerEntity ? playerEntity.getComponent(HealthComponent) : null;
         const enemyHealth = enemyEntity ? enemyEntity.getComponent(HealthComponent) : null;
 
-        if (playerHealth && !playerHealth.isAlive()) {
-            gameOver = true;
-            victory = false;
-        } else if (enemyHealth && !enemyHealth.isAlive()) {
-            gameOver = true;
-            victory = true;
-        }
+        if (playerHealth && !playerHealth.isAlive()) { gameOver = true; victory = false; }
+        else if (enemyHealth && !enemyHealth.isAlive()) { gameOver = true; victory = true; }
         
         if (!gameOver && this.gameTime >= this.maxGameTime) {
             gameOver = true;
             victory = playerHealth && enemyHealth ? playerHealth.currentHealth > enemyHealth.currentHealth : (playerHealth ? true : false);
         }
-        
-        if (gameOver) {
-            this.endGame(victory);
-        }
+        if (gameOver) this.endGame(victory);
     }
 
     endGame(victory) {
+        if (!this.isRunning && this.showingPostGameMessage) return; // Prevent multiple calls if already ending
+
         this.isRunning = false;
-        this.playerInputDisabled = true; // Disable input post-game as well
-        
+        this.playerInputDisabled = true;
         this.postGameMessage = victory ? "VICTORY!" : "DEFEAT!";
-        this.showingPostGameMessage = true; // RenderSystem will pick this up
+        this.showingPostGameMessage = true;
         
+        const renderSys = this.systems.find(s => s instanceof RenderSystem);
+        if(renderSys) renderSys.updateDOMUI(this.entityManager); // Update to show message immediately
+
         if (this.options.audioManager) {
             this.options.audioManager.playSound(victory ? 'victory' : 'defeat');
         }
 
-        // After a delay, hide the message and emit gameOver to transition to stats screen
         setTimeout(() => {
             this.showingPostGameMessage = false;
-            // this.postGameMessage = ""; // Clearing it here might be too soon if RenderSystem needs it for fade out
+            if(renderSys) renderSys.updateDOMUI(this.entityManager); // Update to hide message
 
             const endTime = Date.now();
             const duration = endTime - this.gameStats.startTime;
             const accuracy = this.gameStats.shots > 0 ? Math.round((this.gameStats.hits / this.gameStats.shots) * 100) : 0;
-
-            const resultData = { // Renamed to avoid conflict with 'result' variable name if any
-                victory,
-                time: this.formatTime(duration),
-                timeSeconds: duration / 1000,
-                damage: this.gameStats.damage,
-                accuracy,
-                duration
-            };
-
+            const resultData = { victory, time: this.formatTime(duration), timeSeconds: duration / 1000, damage: this.gameStats.damage, accuracy, duration };
             this.emit('gameOver', resultData);
             console.log('Game ended:', resultData);
-
-        }, 2500); // Show message for 2.5 seconds
+        }, 2500);
     }
 
     formatTime(milliseconds) {
         const seconds = Math.floor(milliseconds / 1000);
         const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = seconds % 60;
-        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+        const rs = seconds % 60;
+        return `${minutes}:${rs.toString().padStart(2, '0')}`;
     }
 
     togglePause() {
         this.isPaused = !this.isPaused;
         const pauseBtn = document.getElementById('pause-btn');
         const pauseMenu = document.getElementById('pause-menu');
-
-        if (pauseBtn) {
-            pauseBtn.textContent = this.isPaused ? '▶️' : '⏸️';
-        }
+        if (pauseBtn) pauseBtn.textContent = this.isPaused ? '▶️' : '⏸️';
         if (pauseMenu) {
             if (this.isPaused) {
-                // pauseMenu.style.display = 'flex'; // Using flex to center content
-                // setTimeout(() => pauseMenu.classList.add('active'), 10); // Trigger transition
-                pauseMenu.classList.add('active'); // Assumes .screen.active handles visibility and opacity
-                pauseMenu.style.transform = 'none'; // Ensure it's centered if base .screen transform was translateX(100%)
+                pauseMenu.classList.add('active');
+                pauseMenu.style.transform = 'none';
                 pauseMenu.style.opacity = '1';
                 pauseMenu.style.visibility = 'visible';
-
-
             } else {
-                // pauseMenu.classList.remove('active');
-                // setTimeout(() => pauseMenu.style.display = 'none', 300); // Hide after transition
                 pauseMenu.style.opacity = '0';
                 pauseMenu.style.visibility = 'hidden';
-                // No need to change display to none if using visibility for transitions + overlay nature
+                // Consider removing 'active' class after transition via event listener if it affects other things
             }
         }
-        this.emit('pause', this.isPaused); // Emit event for other listeners (e.g. app.js)
+        this.emit('pause', this.isPaused);
     }
 
-    pause() { // Ensure this also shows menu if called externally
-        if (!this.isPaused) {
-            this.togglePause();
-        }
-    }
-    resume() { // Ensure this also hides menu
-        if (this.isPaused) {
-            this.togglePause();
-        }
-    }
+    pause() { if (!this.isPaused) this.togglePause(); }
+    resume() { if (this.isPaused) this.togglePause(); }
 
     setZoom(zoom) { this.camera.zoom = zoom; }
-
     handleResize() { this.setupCanvas(); }
 
     on(event, callback) {
         if (!this.eventListeners[event]) this.eventListeners[event] = [];
         this.eventListeners[event].push(callback);
     }
-
     emit(event, data) {
         if (this.eventListeners[event]) {
             this.eventListeners[event].forEach(callback => callback(data));
@@ -801,24 +649,16 @@ export class GameEngine {
 
     destroy() {
         this.isRunning = false;
+        // Clear any intervals (like countdown)
+        if (this.countdownInterval) clearInterval(this.countdownInterval); // Ensure interval ID is stored
+
         if (this.physics) this.physics.cleanup();
         if (this.controls) this.controls.cleanup();
-        
         this.entityManager.getAllEntities().forEach(entity => this.entityManager.removeEntity(entity.id));
-        
-        for (const system of this.systems) {
-            if (typeof system.destroy === 'function') {
-                system.destroy();
-            }
-        }
+        this.systems.forEach(system => { if (typeof system.destroy === 'function') system.destroy(); });
         this.systems = [];
         this.systemUpdateOrder = [];
         this.eventListeners = {};
         console.log('GameEngine destroyed and cleaned up.');
     }
 }
-// Note: The drawing methods (drawArenaBackground, etc.) and some logic (firePlayerWeapon)
-// are still in GameEngine.js. These need to be moved into their respective Systems
-// (RenderSystem, WeaponSystem, etc.) in subsequent steps.
-// The current goal is to get the core ECS loop running with entities and components.
-

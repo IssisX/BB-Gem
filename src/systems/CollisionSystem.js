@@ -1,14 +1,14 @@
-const System = require('../System');
-const HealthComponent = require('../components/HealthComponent');
-const PhysicsComponent = require('../components/PhysicsComponent');
-const ProjectileComponent = require('../components/ProjectileComponent');
-const PlayerControlledComponent = require('../components/PlayerControlledComponent');
-const AIControlledComponent = require('../components/AIControlledComponent');
-const PositionComponent = require('../components/PositionComponent');
-const AnimationComponent = require('../components/AnimationComponent'); // Import AnimationComponent
+import System from '../System.js';
+import HealthComponent from '../components/HealthComponent.js';
+import PhysicsComponent from '../components/PhysicsComponent.js';
+import ProjectileComponent from '../components/ProjectileComponent.js';
+import PlayerControlledComponent from '../components/PlayerControlledComponent.js';
+import AIControlledComponent from '../components/AIControlledComponent.js';
+import PositionComponent from '../components/PositionComponent.js';
+import AnimationComponent from '../components/AnimationComponent.js';
 
 class CollisionSystem extends System {
-  constructor(physicsEngine, entityManager, particleSystem, effectSystem) { // Added effectSystem from game.js
+  constructor(physicsEngine, entityManager, particleSystem, effectSystem) {
     super();
     this.physicsEngine = physicsEngine;
     this.entityManager = entityManager;
@@ -163,4 +163,4 @@ class CollisionSystem extends System {
   }
 }
 
-module.exports = CollisionSystem;
+export default CollisionSystem;

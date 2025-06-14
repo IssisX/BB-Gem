@@ -1,4 +1,4 @@
-const Component = require('../Component');
+import Component from '../Component.js';
 
 class EnergyComponent extends Component {
   constructor(maxEnergy = 100, regenerationRate = 5) { // regenerationRate is units per second
@@ -26,4 +26,4 @@ class EnergyComponent extends Component {
   }
 }
 
-module.exports = EnergyComponent;
+export default EnergyComponent;

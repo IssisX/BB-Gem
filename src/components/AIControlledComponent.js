@@ -1,4 +1,4 @@
-const Component = require('../Component');
+import Component from '../Component.js';
 
 class AIControlledComponent extends Component {
   constructor(initialState = 'idle', target = null) {
@@ -12,4 +12,4 @@ class AIControlledComponent extends Component {
   }
 }
 
-module.exports = AIControlledComponent;
+export default AIControlledComponent;

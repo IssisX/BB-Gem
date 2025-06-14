@@ -1,4 +1,4 @@
-const Entity = require('./Entity');
+import Entity from './Entity.js';
 
 class EntityManager {
   constructor() {
@@ -120,4 +120,4 @@ class EntityManager {
   }
 }
 
-module.exports = EntityManager;
+export default EntityManager;

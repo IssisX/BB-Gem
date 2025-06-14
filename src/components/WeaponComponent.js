@@ -1,4 +1,4 @@
-const Component = require('../Component');
+import Component from '../Component.js';
 
 class WeaponComponent extends Component {
   constructor(
@@ -36,4 +36,4 @@ class WeaponComponent extends Component {
   }
 }
 
-module.exports = WeaponComponent;
+export default WeaponComponent;

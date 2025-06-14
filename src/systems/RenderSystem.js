@@ -1,12 +1,18 @@
-const System = require('../System');
-const PositionComponent = require('../components/PositionComponent');
-const RenderComponent = require('../components/RenderComponent');
-const HealthComponent = require('../components/HealthComponent');
-const PhysicsComponent = require('../components/PhysicsComponent'); // For shield effect, if physics body stores that state
-const EnergyComponent = require('../components/EnergyComponent'); // For energy glow effect
+import System from '../System.js';
+import PositionComponent from '../components/PositionComponent.js';
+import RenderComponent from '../components/RenderComponent.js';
+import HealthComponent from '../components/HealthComponent.js';
+import PhysicsComponent from '../components/PhysicsComponent.js';
+import EnergyComponent from '../components/EnergyComponent.js';
+// For drawMinimap to check entity types for coloring dots
+import PlayerControlledComponent from '../components/PlayerControlledComponent.js';
+import AIControlledComponent from '../components/AIControlledComponent.js';
+// For drawScreenEffects to get EffectComponent
+import EffectComponent from '../components/EffectComponent.js';
+
 
 class RenderSystem extends System {
-  constructor(canvasContext, entityManager, camera, gameEngine) { // gameEngine for minimap access initially
+  constructor(canvasContext, entityManager, camera, gameEngine) {
     super();
     this.ctx = canvasContext;
     this.entityManager = entityManager;
@@ -186,7 +192,7 @@ class RenderSystem extends System {
   drawScreenEffects(ctx, screenWidth, screenHeight, allEntities) {
     // Iterate for 'screenTint' effects
     for (const entity of allEntities) {
-      const effectComp = entity.getComponent(require('../components/EffectComponent')); // Dynamic require
+      const effectComp = entity.getComponent(EffectComponent); // Use static import
       if (effectComp && effectComp.effectType === 'screenTint' && effectComp.isAlive()) {
         ctx.save();
         ctx.fillStyle = effectComp.getCurrentColor();
@@ -284,6 +290,21 @@ class RenderSystem extends System {
 
 
   // --- Drawing Helper Methods (migrated from GameEngine) ---
+
+  // Method to set current map display properties
+  setMap(mapData) {
+    this.mapDimensions = mapData.dimensions;
+    this.mapBackgroundInfo = mapData.background;
+    // Collect all sprite paths from map background layers for preloading
+    if (this.mapBackgroundInfo && this.mapBackgroundInfo.layers) {
+        this.mapBackgroundInfo.layers.forEach(layer => {
+            if (layer.imagePath) this.imagePathsToLoad.add(layer.imagePath);
+        });
+    }
+    // TODO: Trigger preloading if not already done, or if new paths added.
+    // This might be better handled in GameEngine.loadLevel by calling a specific
+    // method in RenderSystem to register map sprites, then calling preloadImages.
+  }
 
   drawLayeredEntity(ctx, entity, renderComp) {
     // Sort layers by their zOrderOffset if it exists, otherwise draw in order
@@ -556,15 +577,14 @@ class RenderSystem extends System {
 
     entities.forEach(entity => {
         const posComp = entity.getComponent(PositionComponent);
-        const renderComp = entity.getComponent(RenderComponent); // To check if it's a bot or player
+        const renderComp = entity.getComponent(RenderComponent);
         if (posComp && renderComp) {
-            let color = '#888888'; // Default color for other entities
-            if (renderComp.shape === 'bot') { // Check if it's a bot
-                 // Differentiate player and enemy by RenderComponent.color or specific component
-                if (entity.hasComponent(require('../components/PlayerControlledComponent'))) { // Dynamic require for brevity
-                    color = '#00ffff'; // Player color
-                } else if (entity.hasComponent(require('../components/AIControlledComponent'))) {
-                    color = '#ff0040'; // Enemy color
+            let color = '#888888';
+            if (renderComp.shape === 'bot') {
+                if (entity.hasComponent(PlayerControlledComponent)) {
+                    color = '#00ffff';
+                } else if (entity.hasComponent(AIControlledComponent)) {
+                    color = '#ff0040';
                 }
             }
             ctx.fillStyle = color;
@@ -578,4 +598,4 @@ class RenderSystem extends System {
   }
 }
 
-module.exports = RenderSystem;
+export default RenderSystem;

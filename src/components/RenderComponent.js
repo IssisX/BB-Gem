@@ -1,7 +1,7 @@
-const Component = require('../Component');
+import Component from '../Component.js';
 
 class RenderComponent extends Component {
-  constructor(shape = 'circle', color = 'blue', spriteName = null, isVisible = true, zOrder = 0, size = 10) { // Changed 'layer' to 'zOrder' for clarity
+  constructor(shape = 'circle', color = 'blue', spriteName = null, isVisible = true, zOrder = 0, size = 10, width, height, glowColor, glowSize) { // Added more params from projectile creation
     super();
     this.shape = shape;
     this.color = color;

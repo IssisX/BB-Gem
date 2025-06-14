@@ -1,4 +1,4 @@
-const Component = require('../Component');
+import Component from '../Component.js';
 
 class AnimationComponent extends Component {
   constructor(animations = {}) {
@@ -80,4 +80,4 @@ class AnimationComponent extends Component {
   }
 }
 
-module.exports = AnimationComponent;
+export default AnimationComponent;

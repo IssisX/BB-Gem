@@ -184,4 +184,4 @@ class DataManager {
     }
 }
 
-module.exports = DataManager;
+export default DataManager;
