@@ -39,264 +39,197 @@ class App {
     }
 
     async init() {
+        // Simplified init
         document.getElementById('loading-screen').classList.add('active');
         this.currentScreen = 'loading-screen';
+        console.log('[APP_DEBUG] Simplified App.init() started.');
 
         try {
             await this.storageManager.init();
+            console.log('[APP_DEBUG] StorageManager initialized.');
             const savedSettings = await this.storageManager.getSettings();
             if (savedSettings) {
                 this.settings = { ...this.settings, ...savedSettings };
+                console.log('[APP_DEBUG] Settings loaded from storage.');
+            } else {
+                console.log('[APP_DEBUG] No saved settings found, using defaults.');
             }
-
-            // Pass current settings to ControlsManager if it has an updateOptions method
-            if (this.controlsManager && typeof this.controlsManager.updateOptions === 'function') {
-                 this.controlsManager.updateOptions({
-                     sensitivity: this.settings.sensitivity,
-                     hapticFeedback: this.settings.hapticFeedback
-                     // Pass other relevant settings if ControlsManager uses them
-                 });
-            }
-
-            await this.dataManager.loadAllData(); // CRITICAL: Load all game data
             
+            await this.dataManager.loadAllData();
+            console.log('[APP_DEBUG] DataManager.loadAllData() awaited.');
+
             await this.audioManager.init();
             this.audioManager.setVolume(this.settings.volume);
+            console.log('[APP_DEBUG] AudioManager initialized and volume set.');
             
-            this.setupEventListeners(); // Setup global event listeners
-            this.setupSettingsHandlers(); // Setup listeners for settings screen elements
-            this.setupTutorialEventHandlers(); // Setup listeners for tutorial buttons
+            this.setupEventListeners(); // This will now be the simplified version
+            console.log('[APP_DEBUG] Simplified event listeners set up.');
 
-            this.updateControlSchemeVisuals(); // Initial UI update for controls
+            // Comment out non-essential UI updates for this debug session
+            // this.setupSettingsHandlers();
+            // this.setupTutorialEventHandlers();
+            // this.updateControlSchemeVisuals();
 
-            // const tutorialCompleted = await this.storageManager.getSetting('tutorialCompleted');
-            // if (!tutorialCompleted) {
-            //     this.startTutorial();
-            // } else {
-            //     this.showScreen('main-menu');
-            // }
-
-            console.log('[APP] Initialization complete. Attempting to start Quick Battle directly.');
-            await this.startQuickBattle(); // ADD THIS LINE to go straight to game
-
-            // Ensure loading screen is hidden AFTER attempting to start the game
-            // (showScreen('game-arena') should handle making itself active and hiding others)
+            // Directly show main menu after loading
             const loadingScreen = document.getElementById('loading-screen');
-            if (loadingScreen && loadingScreen.classList.contains('active')) {
-                loadingScreen.classList.remove('active');
+            const mainMenuScreen = document.getElementById('main-menu');
+            if (loadingScreen) {
                 loadingScreen.style.display = 'none';
-                console.log('[APP] Loading screen hidden after attempting direct game start.');
+                loadingScreen.classList.remove('active');
+            }
+            if (mainMenuScreen) {
+                mainMenuScreen.style.display = 'flex'; // Or 'block'
+                mainMenuScreen.classList.add('active');
+                this.currentScreen = 'main-menu';
+                console.log('[APP_DEBUG] Main menu forced to display after init.');
+            } else {
+                console.error('[APP_DEBUG] Main menu screen not found in init!');
             }
 
         } catch (error) {
-            console.error('Failed to initialize app or start quick battle directly:', error);
-            // Fallback: try to show main menu if direct game start fails catastrophically
+            console.error('[APP_DEBUG] CRITICAL ERROR during simplified App.init():', error);
             const loadingScreen = document.getElementById('loading-screen');
             if (loadingScreen) {
-                loadingScreen.classList.remove('active');
                 loadingScreen.style.display = 'none';
+                loadingScreen.classList.remove('active');
             }
-            this.showScreen('main-menu'); // Fallback to main menu on error
+            // Maybe display a static error message on the page if main-menu itself is the issue
+            const errorDisplay = document.createElement('div');
+            errorDisplay.textContent = 'Critical error during initialization. Check console.';
+            errorDisplay.style.color = 'red';
+            errorDisplay.style.padding = '20px';
+            document.body.appendChild(errorDisplay);
         }
     }
 
     setupEventListeners() {
-        // Menu button handlers
-        document.addEventListener('click', this.handleClick.bind(this));
+        // Simplified event listeners - ONLY for Quick Battle button
+        console.log('[APP_DEBUG] Setting up TARGETED event listener for Quick Battle button.');
+        // document.addEventListener('click', this.handleClick.bind(this)); // Commented out general click handler
         
-        // Settings handlers (already called in init)
-        // this.setupSettingsHandlers();
-        
-        // Prevent context menu on long press
-        document.addEventListener('contextmenu', (e) => e.preventDefault());
-        
-        // Handle orientation changes
-        window.addEventListener('orientationchange', () => {
-            setTimeout(() => this.handleOrientationChange(), 100);
-        });
-        
-        // Handle visibility changes for battery optimization
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden && this.gameEngine && !this.gameEngine.isPaused && this.currentScreen === 'game-arena') {
-                // Only pause if game is running and not already paused
-                this.gameEngine.togglePause();
-            }
-        });
-    }
-
-    setupSettingsHandlers() {
-        const qualitySelect = document.getElementById('quality-setting');
-        const framerateSelect = document.getElementById('framerate-setting');
-        const hapticCheckbox = document.getElementById('haptic-setting');
-        const sensitivitySlider = document.getElementById('sensitivity-setting');
-        const volumeSlider = document.getElementById('volume-setting');
-
-        if (qualitySelect) {
-            qualitySelect.value = this.settings.quality;
-            qualitySelect.addEventListener('change', (e) => {
-                this.settings.quality = e.target.value;
-                this.saveSettingsAndUpdateGame();
-            });
-        }
-
-        if (framerateSelect) {
-            framerateSelect.value = this.settings.framerate;
-            framerateSelect.addEventListener('change', (e) => {
-                this.settings.framerate = parseInt(e.target.value);
-                this.saveSettingsAndUpdateGame();
-            });
-        }
-
-        if (hapticCheckbox) {
-            hapticCheckbox.checked = this.settings.hapticFeedback;
-            hapticCheckbox.addEventListener('change', (e) => {
-                this.settings.hapticFeedback = e.target.checked;
-                this.saveSettingsAndUpdateGame();
-            });
-        }
-
-        if (sensitivitySlider) {
-            sensitivitySlider.value = this.settings.sensitivity;
-            sensitivitySlider.addEventListener('input', (e) => {
-                this.settings.sensitivity = parseFloat(e.target.value);
-                // No need to call saveSettingsAndUpdateGame() on every input, maybe on 'change'
-            });
-            sensitivitySlider.addEventListener('change', (e) => { // Save on release
-                this.settings.sensitivity = parseFloat(e.target.value);
-                this.saveSettingsAndUpdateGame();
-            });
-        }
-
-        if (volumeSlider) {
-            volumeSlider.value = this.settings.volume;
-            volumeSlider.addEventListener('input', (e) => {
-                this.settings.volume = parseFloat(e.target.value);
-                this.audioManager.setVolume(this.settings.volume);
-                // No need to call saveSettingsAndUpdateGame() on every input, maybe on 'change'
-            });
-            volumeSlider.addEventListener('change', (e) => { // Save on release
-                 this.settings.volume = parseFloat(e.target.value);
-                this.saveSettingsAndUpdateGame(); // Persist volume
-            });
-        }
-    }
-
-    async saveSettingsAndUpdateGame() {
-        await this.storageManager.saveSettings(this.settings);
-        // Update ControlsManager if settings affecting it changed
-        if (this.controlsManager && typeof this.controlsManager.updateOptions === 'function') {
-            this.controlsManager.updateOptions({
-                sensitivity: this.settings.sensitivity,
-                hapticFeedback: this.settings.hapticFeedback
-            });
-        }
-        // Update GameEngine if settings affecting it changed (e.g., quality)
-        if (this.gameEngine && typeof this.gameEngine.updateOptions === 'function') {
-            this.gameEngine.updateOptions({
-                quality: this.settings.quality,
-                framerate: this.settings.framerate,
-                hapticFeedback: this.settings.hapticFeedback,
-                sensitivity: this.settings.sensitivity
-            });
-        }
-    }
-
-
-    async saveSettings() { // Kept for direct calls if needed, but prefer saveSettingsAndUpdateGame
-        await this.storageManager.saveSettings(this.settings);
-    }
-
-    handleClick(event) {
-        console.log('[APP] handleClick triggered'); // Log entry into the handler
-        const target = event.target.closest('[data-action]');
-        if (!target) {
-            console.log('[APP] No data-action target found for click.');
-            return;
-        }
-
-        const action = target.dataset.action;
-        console.log(`[APP] Action: ${action}`); // Log the identified action
-
-        // Keep existing audio/haptic feedback if desired
-        if (action !== 'tutorial-next' && action !== 'tutorial-skip') { // Avoid double sound for tutorial
-             this.audioManager.playSound('ui_click');
-        }
-        if (this.settings.hapticFeedback && navigator.vibrate) {
-            navigator.vibrate(10);
-        }
-
-        switch (action) {
-            case 'quick-battle':
-                console.log('[APP] Case: quick-battle');
-                this.startQuickBattle();
-                break;
-            case 'bot-builder':
-                console.log('[APP] Case: bot-builder');
-                this.showScreen('bot-builder');
-                break;
-            case 'settings':
-                console.log('[APP] Case: settings');
-                this.cameFromPauseMenu = (this.currentScreen === 'game-arena' && this.gameEngine && this.gameEngine.isPaused);
-                this.showScreen('settings');
-                break;
-            case 'back':
-                console.log('[APP] Case: back');
-                if (this.currentScreen === 'settings' && this.cameFromPauseMenu) {
-                    this.showScreen('game-arena');
-                    const pauseMenu = document.getElementById('pause-menu');
-                    if(this.gameEngine && this.gameEngine.isPaused && pauseMenu) {
-                        pauseMenu.classList.add('active');
-                        pauseMenu.style.display = 'flex';
-                        pauseMenu.style.opacity = '1';
-                        pauseMenu.style.visibility = 'visible';
-                    }
-                } else {
-                    this.showScreen('main-menu');
+        const quickBattleButton = document.querySelector('[data-action="quick-battle"]');
+        if (quickBattleButton) {
+            quickBattleButton.addEventListener('click', (event) => {
+                console.log("[APP_DEBUG] Quick Battle button CLICKED!");
+                event.stopPropagation(); // Prevent other listeners if any were accidentally left
+                this.audioManager.playSound('ui_click');
+                if (this.settings.hapticFeedback && navigator.vibrate) {
+                    navigator.vibrate(10);
                 }
-                this.cameFromPauseMenu = false;
-                break;
-            case 'save-bot':
-                console.log('[APP] Case: save-bot');
-                this.saveBotDesign();
-                break;
-            case 'play-again':
-                console.log('[APP] Case: play-again');
                 this.startQuickBattle();
-                break;
-            case 'main-menu': // From Game Over or other screens
-                console.log('[APP] Case: main-menu (action)');
-                this.showScreen('main-menu');
-                break;
-            case 'resume-game':
-                console.log('[APP] Case: resume-game');
-                if(this.gameEngine) this.gameEngine.resume();
-                break;
-            case 'quit-to-main-menu':
-                console.log('[APP] Case: quit-to-main-menu');
-                if(this.gameEngine) {
-                     this.gameEngine.destroy();
-                     this.gameEngine = null;
-                }
-                this.isGamePaused = false;
-                this.showScreen('main-menu');
-                break;
-            case 'tutorial-next':
-                console.log('[APP] Case: tutorial-next');
-                this.handleTutorialNext();
-                break;
-            case 'tutorial-skip':
-                console.log('[APP] Case: tutorial-skip');
-                this.endTutorial();
-                break;
-            default:
-                console.warn(`[APP] Unhandled action in handleClick: ${action}`);
+            });
+            console.log('[APP_DEBUG] Event listener for Quick Battle button ADDED.');
+        } else {
+            console.error('[APP_DEBUG] Quick Battle button [data-action="quick-battle"] NOT FOUND in setupEventListeners!');
         }
+
+        // Comment out other listeners for this debug session
+        // document.addEventListener('contextmenu', (e) => e.preventDefault());
+        // window.addEventListener('orientationchange', () => {
+        //     setTimeout(() => this.handleOrientationChange(), 100);
+        // });
+        // document.addEventListener('visibilitychange', () => {
+        //     if (document.hidden && this.gameEngine && !this.gameEngine.isPaused && this.currentScreen === 'game-arena') {
+        //         this.gameEngine.togglePause();
+        //     }
+        // });
     }
+
+    // setupSettingsHandlers() { // COMMENTED OUT FOR DEBUGGING
+    //     const qualitySelect = document.getElementById('quality-setting');
+    //     const framerateSelect = document.getElementById('framerate-setting');
+    //     const hapticCheckbox = document.getElementById('haptic-setting');
+    //     const sensitivitySlider = document.getElementById('sensitivity-setting');
+    //     const volumeSlider = document.getElementById('volume-setting');
+
+    //     if (qualitySelect) {
+    //         qualitySelect.value = this.settings.quality;
+    //         qualitySelect.addEventListener('change', (e) => {
+    //             this.settings.quality = e.target.value;
+    //             this.saveSettingsAndUpdateGame();
+    //         });
+    //     }
+
+    //     if (framerateSelect) {
+    //         framerateSelect.value = this.settings.framerate;
+    //         framerateSelect.addEventListener('change', (e) => {
+    //             this.settings.framerate = parseInt(e.target.value);
+    //             this.saveSettingsAndUpdateGame();
+    //         });
+    //     }
+
+    //     if (hapticCheckbox) {
+    //         hapticCheckbox.checked = this.settings.hapticFeedback;
+    //         hapticCheckbox.addEventListener('change', (e) => {
+    //             this.settings.hapticFeedback = e.target.checked;
+    //             this.saveSettingsAndUpdateGame();
+    //         });
+    //     }
+
+    //     if (sensitivitySlider) {
+    //         sensitivitySlider.value = this.settings.sensitivity;
+    //         sensitivitySlider.addEventListener('input', (e) => {
+    //             this.settings.sensitivity = parseFloat(e.target.value);
+    //             // No need to call saveSettingsAndUpdateGame() on every input, maybe on 'change'
+    //         });
+    //         sensitivitySlider.addEventListener('change', (e) => { // Save on release
+    //             this.settings.sensitivity = parseFloat(e.target.value);
+    //             this.saveSettingsAndUpdateGame();
+    //         });
+    //     }
+
+    //     if (volumeSlider) {
+    //         volumeSlider.value = this.settings.volume;
+    //         volumeSlider.addEventListener('input', (e) => {
+    //             this.settings.volume = parseFloat(e.target.value);
+    //             this.audioManager.setVolume(this.settings.volume);
+    //             // No need to call saveSettingsAndUpdateGame() on every input, maybe on 'change'
+    //         });
+    //         volumeSlider.addEventListener('change', (e) => { // Save on release
+    //              this.settings.volume = parseFloat(e.target.value);
+    //             this.saveSettingsAndUpdateGame(); // Persist volume
+    //         });
+    //     }
+    // }
+
+    // async saveSettingsAndUpdateGame() { // COMMENTED OUT FOR DEBUGGING
+    //     await this.storageManager.saveSettings(this.settings);
+    //     if (this.controlsManager && typeof this.controlsManager.updateOptions === 'function') {
+    //         this.controlsManager.updateOptions({
+    //             sensitivity: this.settings.sensitivity,
+    //             hapticFeedback: this.settings.hapticFeedback
+    //         });
+    //     }
+    //     if (this.gameEngine && typeof this.gameEngine.updateOptions === 'function') {
+    //         this.gameEngine.updateOptions({
+    //             quality: this.settings.quality,
+    //             framerate: this.settings.framerate,
+    //             hapticFeedback: this.settings.hapticFeedback,
+    //             sensitivity: this.settings.sensitivity
+    //         });
+    //     }
+    // }
+
+    // async saveSettings() { // COMMENTED OUT FOR DEBUGGING
+    //     await this.storageManager.saveSettings(this.settings);
+    // }
+
+    // handleClick(event) { // COMMENTED OUT FOR DEBUGGING - Replaced by targeted listener
+    //     console.log('[APP] handleClick triggered');
+    //     const target = event.target.closest('[data-action]');
+    //     if (!target) {
+    //         console.log('[APP] No data-action target found for click.');
+    //         return;
+    //     }
+    //     const action = target.dataset.action;
+    //     console.log(`[APP] Action: ${action}`);
+    //     // ... rest of original handleClick
+    // }
 
     showScreen(screenId) {
-        console.log(`[APP] Attempting to show screen: ${screenId}. Current screen: ${this.currentScreen}`);
+        // Drastically simplified showScreen for debugging
+        console.log(`[APP_DEBUG] showScreen('${screenId}') called. Current: ${this.currentScreen}`);
 
-        // Hide all screens first to avoid multiple active screens
         const screens = document.querySelectorAll('.screen');
         screens.forEach(s => {
             s.style.display = 'none';
@@ -306,80 +239,76 @@ class App {
         const newScreenElement = document.getElementById(screenId);
 
         if (newScreenElement) {
-            newScreenElement.style.display = 'flex'; // Assuming 'flex' is the desired display style for active screens
+            newScreenElement.style.display = 'flex'; // Assuming 'flex'
             newScreenElement.classList.add('active');
-            console.log(`[APP] Successfully shown screen: ${screenId}. New currentScreen will be set.`);
-            this.currentScreen = screenId; // Update currentScreen *after* successful display
+            this.currentScreen = screenId;
+            console.log(`[APP_DEBUG] Screen '${screenId}' activated.`);
         } else {
-            console.error(`[APP] Screen element not found for ID: ${screenId}. Current screen remains: ${this.currentScreen}`);
-            // Optionally, revert to a known safe screen like main-menu if the target is not found
-            // if (this.currentScreen !== 'main-menu') this.showScreen('main-menu');
-            return;
+            console.error(`[APP_DEBUG] Screen element not found for ID: ${screenId}!`);
+            return; // Important to stop if screen not found
         }
         
-        // Minimal screen-specific logic for testing button flow
         if (screenId === 'game-arena') {
-            console.log("[APP] Screen is 'game-arena', calling initializeGame().");
-            // Ensure this.initializeGame() is robust and logs its own progress/errors
+            console.log("[APP_DEBUG] 'game-arena' screen selected, calling initializeGame().");
             this.initializeGame();
         } else if (screenId === 'main-menu') {
-            console.log("[APP] Screen is 'main-menu'. Destroying gameEngine if it exists.");
+            console.log("[APP_DEBUG] 'main-menu' screen selected. Destroying gameEngine if exists.");
             if (this.gameEngine && typeof this.gameEngine.destroy === 'function') {
-                // Check if it's already destroyed to avoid errors
                 if (typeof this.gameEngine.isDestroyed !== 'function' || !this.gameEngine.isDestroyed()) {
                     this.gameEngine.destroy();
                 }
-                this.gameEngine = null; // Clear reference
-                console.log("[APP] Game engine destroyed.");
+                this.gameEngine = null;
+                console.log("[APP_DEBUG] Game engine destroyed for main menu.");
             }
             this.isGamePaused = false;
             this.cameFromPauseMenu = false;
-        } else if (screenId === 'settings') {
-            console.log("[APP] Screen is 'settings'.");
-            // Settings specific setup if any, e.g., populating fields from this.settings
-            // this.populateSettingsScreen(); // Example if needed
-        } else if (screenId === 'bot-builder') {
-            console.log("[APP] Screen is 'bot-builder', calling initializeBotBuilder().");
-            this.initializeBotBuilder();
         }
-        // Add other essential screen logic if needed for testing this path
+        // No other screen logic for this hyper-focused debug
 
-        // If loading screen was active and we're moving to another screen, ensure it's hidden.
         const loadingScreen = document.getElementById('loading-screen');
         if (screenId !== 'loading-screen' && loadingScreen && loadingScreen.classList.contains('active')) {
             loadingScreen.style.display = 'none';
             loadingScreen.classList.remove('active');
-            console.log("[APP] Loading screen explicitly hidden.");
+            console.log("[APP_DEBUG] Loading screen explicitly hidden by showScreen.");
         }
-        console.log(`[APP] Current screen is now: ${this.currentScreen}`);
+        console.log(`[APP_DEBUG] Current screen is now: ${this.currentScreen}`);
     }
 
     async startQuickBattle() {
-        console.log('[APP] startQuickBattle called.');
-        // The actual game start is handled by initializeGame called from showScreen('game-arena')
+        console.log('[APP_DEBUG] startQuickBattle() called.');
         this.showScreen('game-arena');
-        // Audio play can remain if it's not causing issues
-        this.audioManager.playSound('battle-start');
+        // this.audioManager.playSound('battle-start'); // Keep audio minimal for now
     }
 
     async initializeGame() {
-        console.log('[APP] initializeGame called.');
+        console.log('[APP_DEBUG] initializeGame() called.');
         if (this.gameEngine && typeof this.gameEngine.destroy === 'function' && (typeof this.gameEngine.isDestroyed !== 'function' || !this.gameEngine.isDestroyed())) {
             this.gameEngine.destroy();
             this.gameEngine = null;
         }
         
         const canvas = document.getElementById('game-canvas');
-        if (!this.dataManager || !this.dataManager.mapsById || !this.dataManager.mapsById.size > 0) {
-            console.error("DataManager not ready or no data loaded before starting game!");
-            alert("Error: Game data failed to load. Please refresh.");
-            this.showScreen('main-menu');
+        if (!canvas) {
+            console.error('[APP_DEBUG] initializeGame: Canvas element not found!');
+            alert("Error: Game canvas not found. Cannot start game.");
+            this.showScreen('main-menu'); // Fallback
             return;
         }
+        console.log('[APP_DEBUG] initializeGame: Canvas element found.');
 
-        this.gameEngine = new GameEngine(
-            canvas,
-            {
+        if (!this.dataManager || !this.dataManager.mapsById || !this.dataManager.mapsById.size === 0) {
+            console.error("[APP_DEBUG] initializeGame: DataManager not ready or no map data loaded!");
+            alert("Error: Game data (maps) failed to load. Please refresh and check console.");
+            this.showScreen('main-menu'); // Fallback
+            return;
+        }
+        console.log('[APP_DEBUG] initializeGame: DataManager seems ready with map data.');
+
+        try {
+            console.log('[APP_DEBUG] initializeGame: Instantiating GameEngine...');
+            this.gameEngine = new GameEngine(
+                canvas,
+                {
                 quality: this.settings.quality,
                 framerate: this.settings.framerate,
                 hapticFeedback: this.settings.hapticFeedback,
