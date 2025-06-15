@@ -69,18 +69,34 @@ class App {
 
             this.updateControlSchemeVisuals(); // Initial UI update for controls
 
-            const tutorialCompleted = await this.storageManager.getSetting('tutorialCompleted');
-            if (!tutorialCompleted) {
-                this.startTutorial();
-            } else {
-                this.showScreen('main-menu');
+            // const tutorialCompleted = await this.storageManager.getSetting('tutorialCompleted');
+            // if (!tutorialCompleted) {
+            //     this.startTutorial();
+            // } else {
+            //     this.showScreen('main-menu');
+            // }
+
+            console.log('[APP] Initialization complete. Attempting to start Quick Battle directly.');
+            await this.startQuickBattle(); // ADD THIS LINE to go straight to game
+
+            // Ensure loading screen is hidden AFTER attempting to start the game
+            // (showScreen('game-arena') should handle making itself active and hiding others)
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen && loadingScreen.classList.contains('active')) {
+                loadingScreen.classList.remove('active');
+                loadingScreen.style.display = 'none';
+                console.log('[APP] Loading screen hidden after attempting direct game start.');
             }
-            // Loading screen removal is handled by showScreen
+
         } catch (error) {
-            console.error('Failed to initialize app:', error);
-            alert('Critical error during app initialization. Please try refreshing.');
-            document.getElementById('loading-screen').classList.remove('active');
-            // Attempt to show a fallback or simple error message if main-menu itself is problematic
+            console.error('Failed to initialize app or start quick battle directly:', error);
+            // Fallback: try to show main menu if direct game start fails catastrophically
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen) {
+                loadingScreen.classList.remove('active');
+                loadingScreen.style.display = 'none';
+            }
+            this.showScreen('main-menu'); // Fallback to main menu on error
         }
     }
 
